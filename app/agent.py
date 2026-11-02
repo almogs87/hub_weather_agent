@@ -20,6 +20,8 @@ class DemoPlanner:
     """Explicit offline parser for interface tests, not an AI substitute."""
     def __call__(self,message,state,locations):
         text=message.lower()
+        if re.search(r'\b(?:what|which|list)\b.*\b(?:weather|hazards?|events?)\b.*\b(?:support|available|analy[sz]e|ask|answer|types?)\b|\b(?:supported|available)\s+(?:weather|hazards?|events?)\b',text):
+            return Intent(action='capabilities',location_ids=[],hazard=None,start=None,end=None,threshold=None,question=None)
         if re.search(r'\bsnow\s*(?:depth|height|on the ground)\b',text):
             return Intent(action='clarify',location_ids=[],hazard=None,start=None,end=None,threshold=None,question='Snow depth on the ground is not available here. Ask about new snowfall per day instead.')
         if re.search(r'\d+(?:\.\d+)?\s*(?:cm|mm|inches|inch)\b',text):
@@ -34,16 +36,6 @@ class DemoPlanner:
         ids=[i for i in locations if re.search(r'(?<!\w)'+re.escape(i.lower())+r'(?!\w)',text)]
         if 'midwest' in text:ids=[i for i,loc in locations.items() if loc.get('region','').lower()=='midwest']
         base['location_ids']=ids or previous.get('location_ids',[])
-        named_risk=any(x in text for x in ('hurricane','flood','winter disruption','weather disruption risk'))
-        risk_followup=previous.get('action')=='risk' and bool(ids) and not any(word in text for word in ('snow','heat','cold','rain','wind'))
-        if (named_risk or risk_followup) and base['location_ids']:
-            hazard=('hurricane_flood' if 'hurricane' in text and 'flood' in text else 'flood' if 'flood' in text else 'hurricane' if 'hurricane' in text else 'winter' if 'winter' in text else previous.get('hazard') if risk_followup else 'overall')
-            return Intent(**dict(base,action='risk',hazard=hazard,start=None,end=None,threshold=None))
-        if any(word in text for word in ['why','explain']):return Intent(**dict(base,action='explain'))
-        for word,hazard in [('snow','snow'),('rain','heavy_precipitation'),('heat','heat'),('cold','cold'),('wind','wind')]:
-            if word in text:base['hazard']=hazard
-        if base['hazard']!=previous.get('hazard'):base['threshold']=None
-        if re.search(r'\bsnow(?:fall)?\b',text) and not re.search(r'\bheavy\s+snow(?:fall)?\b',text) and not re.search(r'\b(?:same|previous|that|those)\b',text):base['threshold']=None
         years=re.findall(r'\b(?:19|20)\d{2}\b',text)
         if years:
             base['start']=date(int(years[0]),1,1)
@@ -51,6 +43,16 @@ class DemoPlanner:
         if 'last year' in text:
             year=datetime.now(timezone.utc).year-1
             base.update(start=date(year,1,1),end=date(year,12,31))
+        named_risk=any(x in text for x in ('hurricane','flood','winter disruption','weather disruption risk','ice storm','tornado','drought'))
+        risk_followup=previous.get('action')=='risk' and bool(ids) and not any(word in text for word in ('snow','heat','cold','rain','wind'))
+        if (named_risk or risk_followup) and base['location_ids']:
+            hazard=('hurricane_flood' if 'hurricane' in text and 'flood' in text else 'flood' if 'flood' in text else 'hurricane' if 'hurricane' in text else 'ice_storm' if 'ice storm' in text else 'tornado' if 'tornado' in text else 'drought' if 'drought' in text else 'winter' if 'winter' in text else previous.get('hazard') if risk_followup else 'overall')
+            return Intent(**dict(base,action='risk',hazard=hazard,threshold=None))
+        if any(word in text for word in ['why','explain']):return Intent(**dict(base,action='explain'))
+        for word,hazard in [('snow','snow'),('rain','heavy_precipitation'),('heat','heat'),('cold','cold'),('wind','wind')]:
+            if word in text:base['hazard']=hazard
+        if base['hazard']!=previous.get('hazard'):base['threshold']=None
+        if re.search(r'\bsnow(?:fall)?\b',text) and not re.search(r'\bheavy\s+snow(?:fall)?\b',text) and not re.search(r'\b(?:same|previous|that|those)\b',text):base['threshold']=None
         if 'heavy snow' in text:base['threshold']=15
         if 'compare' in text or 'rank' in text:base['action']='compare'
         if not base['location_ids']:
@@ -75,8 +77,8 @@ class Service:
     def weather_analysis(self,location_id,start,end,hazard,threshold=None,dataset=None):
         locations=self.store.locations()
         if location_id not in locations:raise ValueError('Unknown location ID: '+location_id)
-        if end<start or (end-start).days>6000 or start.year<1940:
-            raise ValueError('Weather analysis supports up to 6001 days starting in 1940 or later')
+        if end<start or (end-start).days>10957 or start.year<1940:
+            raise ValueError('Weather analysis supports up to 10958 days starting in 1940 or later')
         location=locations[location_id]
         try:
             request=WeatherRequest(location['latitude'],location['longitude'],start,end,location['timezone'])
@@ -128,7 +130,8 @@ class Service:
         from .schemas import ChatRequest
         request=ChatRequest.model_validate(payload)
         identifier,state=self.store.load(request.conversation_id)
-        intent=Intent.model_validate(self.planner(request.message,state,self.store.locations()).model_dump())
+        capability=DemoPlanner()(request.message,{},{} )
+        intent=capability if capability.action=='capabilities' else Intent.model_validate(self.planner(request.message,state,self.store.locations()).model_dump())
         original_plan=intent.model_dump(mode='json')
         intent,adjustments=apply_metric_policy(request.message,intent)
         if request.scenario is not None:
@@ -137,7 +140,9 @@ class Service:
         scenario_result=None
         data_errors=[]
         risk_results=[]
+        comparison_result=None
         if intent.action=='clarify':answer=intent.question or 'Please specify registered location IDs and the requested analysis.'
+        elif intent.action=='capabilities':answer=('I can analyze daily snowfall, precipitation, heat, cold, and maximum wind. For hub comparisons I can also show NOAA reports of floods, hurricanes, tornadoes, and ice storms; those reports may be unscored when comparable severity is unavailable. Historical daily data can use Open-Meteo ERA5 or NOAA stations; NOAA maximum wind is unavailable. Snow depth and actual hub closures are not currently measured.')
         elif intent.action=='unsupported':answer='Available evidence does not establish flood/hurricane probabilities, blizzards, road closures or flight cancellations. I can analyze snow, precipitation, heat, cold and wind exposure.'
         elif intent.action=='explain':
             if not state.get('last_answer'):answer='Run an analysis first so I can explain its evidence.'
@@ -145,45 +150,69 @@ class Service:
                 answer=state['last_answer']+' The displayed figures come from the recorded evidence and deterministic calculations.'
                 risk_results=state.get('last_risk_results',[])
                 data_errors=state.get('last_data_errors',[])
-        elif intent.action=='risk':
+                comparison_result=state.get('last_comparison')
+        elif intent.action in ('risk','compare'):
+            from .hub_comparison import compare_hubs
             locations=self.store.locations()
-            if not 1<=len(intent.location_ids)<=5 or len(intent.location_ids)!=len(set(intent.location_ids)):raise ValueError('Select between one and five distinct locations')
-            if not set(intent.location_ids)<=set(locations):raise ValueError('Unknown location ID')
-            hazards={'winter':['winter'],'hurricane':['hurricane'],'flood':['inland_flood','coastal_flood'],'hurricane_flood':['hurricane','inland_flood','coastal_flood'],'overall':['winter','hurricane','inland_flood','coastal_flood']}.get(intent.hazard)
-            if not hazards:raise ValueError('Specify a supported county hazard')
-            for loc in intent.location_ids:
-                fips=locations[loc].get('county_fips')
-                if not fips:
-                    data_errors.append(dict(location_id=loc,error='County FIPS unavailable'))
-                    continue
-                try:
-                    result=self.fema.fetch(fips)
-                    result['location_id']=loc
-                    result['selected_scores']={h:result['scores'][h] for h in hazards}
-                    if any(v is None for v in result['selected_scores'].values()):data_errors.append(dict(location_id=loc,error='One or more selected hazard scores unavailable'))
-                    result['screening_score']=max(result['selected_scores'].values()) if all(v is not None for v in result['selected_scores'].values()) else None
-                    risk_results.append(result)
-                except (RuntimeError,ValueError) as exc:data_errors.append(dict(location_id=loc,error=str(exc)))
-            complete=not data_errors
-            if complete and len(hazards)==1:risk_results.sort(key=lambda r:(-r['screening_score'],r['location_id']))
-            def name(item):return item['location_id'].replace('example_','Example ').replace('_',' ').title()
-            if complete and len(hazards)==1 and len(risk_results)>1:
-                top=risk_results[0]['screening_score']
-                leaders=[name(item) for item in risk_results if item['screening_score']==top]
-                label=hazards[0].replace('_',' ')
-                answer=(' and '.join(leaders)+' rank'+('s' if len(leaders)==1 else '')+' highest among the selected hubs for the '+label+' county screening measure.\n\n')
-                answer+='\n'.join(f"{index}. {name(item)}: {item['screening_score']:.1f} out of 100" for index,item in enumerate(risk_results,1))
+            ids=intent.location_ids
+            if re.search(r'\bmidwest\b',request.message.lower()):
+                ids=[i for i,loc in locations.items() if loc.get('region','').lower()=='midwest']
+                intent=intent.model_copy(update=dict(location_ids=ids))
+            if not ids or len(ids)!=len(set(ids)) or len(ids)>25:raise ValueError('Select between one and 25 distinct locations')
+            if not set(ids)<=set(locations):raise ValueError('Unknown location ID')
+            mapping={'winter':['snow','event:Ice Storm'],'hurricane':['event:Hurricane (Typhoon)'],
+                     'flood':['event:Flood','event:Flash Flood'],'hurricane_flood':['event:Hurricane (Typhoon)','event:Flood','event:Flash Flood'],
+                     'overall':['snow','event:Ice Storm','event:Flood','event:Flash Flood','event:Hurricane (Typhoon)'],
+                     'ice_storm':['event:Ice Storm'],'tornado':['event:Tornado'],'drought':['event:Drought'],
+                     'snow':['snow'],'heavy_precipitation':['heavy_precipitation'],'heat':['heat'],'cold':['cold'],'wind':['wind']}
+            selected=mapping.get(intent.hazard or 'snow')
+            if not selected:raise ValueError('Specify a supported hazard')
+            default_threshold={'snow':0,'heavy_precipitation':25,'heat':35,'cold':-10,'wind':50}.get(intent.hazard)
+            if intent.action=='compare' and intent.threshold is not None and intent.threshold!=default_threshold:
+                answer='Custom thresholds for the planning index are set under Index assumptions. Use those settings and ask again.'
             else:
-                answer=('County hazard comparison:' if complete else 'Comparison incomplete; no complete ranking.')
-                for item in risk_results:
-                    answer+='\n'+name(item)+': '+', '.join(k.replace('_',' ')+' '+(f'{v:.1f} out of 100' if v is not None else 'unavailable') for k,v in item['selected_scores'].items())+'.'
-            answer+='\n\nWhat this means: FEMA compares each county\'s estimated annual community losses for the hazard with counties nationwide; a higher score means a higher relative ranking. These figures reflect county-wide people and property, not facility-specific disruption probabilities or the chance a hub will close.'
-            if len(hazards)>1:answer+=' Hazard categories are shown separately; the highest component is an illustrative screening indicator, not a FEMA composite.'
-            if data_errors:answer+='\n\nMissing evidence: '+ '; '.join(e['location_id']+': '+e['error'] for e in data_errors)+'.'
-            state['intent']=intent.model_dump(mode='json')
-            state['last_answer']=answer
-            state['last_risk_results']=risk_results
-            state['last_data_errors']=data_errors
+                period=10;end_year=None
+                if intent.start is not None or intent.end is not None:
+                    if not intent.start or not intent.end or (intent.start.month,intent.start.day)!=(1,1) or (intent.end.month,intent.end.day)!=(12,31):
+                        raise ValueError('Index comparisons require complete calendar years')
+                    period=intent.end.year-intent.start.year+1;end_year=intent.end.year
+                settings=request.index_settings.model_dump() if request.index_settings else {}
+                settings['bands']={k:v for k,v in settings.get('bands',{}).items() if k in selected}
+                source=request.weather_source or os.environ.get('WEATHER_SOURCE','auto')
+                comparison_result=compare_hubs(self,dict(locations=ids,hazards=selected,weather_source=source,**settings),periods=[period],end_year=end_year,allow_many=True)
+                period_key=str(period);values=comparison_result['overall'][period_key];coverage=comparison_result['coverage'][period_key]
+                ranked=sorted(((score,identifier) for identifier,score in values.items() if score is not None),key=lambda item:(-item[0],item[1]))
+                start_year=comparison_result['end_year']-period+1
+                included=', '.join(x.replace('event:','').replace('_',' ') for x in coverage['included_hazards'])
+                answer=f'Planning comparison for {start_year} to {comparison_result["end_year"]}. '
+                if ranked:
+                    answer+=f'Based on {included}, the available index is:'
+                    answer+='\n'+'\n'.join(f'{n}. {locations[i].get("label",i).replace("_"," ").title()}: {score:.1f} / 100' for n,(score,i) in enumerate(ranked,1))
+                else:answer+='There is not enough comparable evidence to calculate an index.'
+                if coverage['partial']:
+                    answer+='\n\nThis is a partial comparison.'
+                    if coverage['excluded_hazards']:answer+=' Not enough data to score: '+', '.join(x.replace('event:','').replace('_',' ') for x in coverage['excluded_hazards'])+'.'
+                    for hazard in coverage['excluded_hazards']:
+                        group=comparison_result['hazards'].get(hazard,{})
+                        if group.get('kind')!='reported_event':continue
+                        if group.get('error'):
+                            answer+='\n'+hazard.replace('event:','')+' data unavailable: '+group['error']+'.'
+                            continue
+                        reports=[]
+                        for location_id in ids:
+                            item=group.get('hubs',{}).get(location_id,{}).get('periods',{}).get(period_key,{})
+                            if 'event_reports' in item:
+                                reports.append(f"{locations[location_id].get('label',location_id)}: {item['event_reports']} reports ({item.get('geographic_scope','unknown scope')}, {item.get('archive_years_available','?')}/{item.get('requested_years','?')} archive years)")
+                        if reports:answer+='\n'+hazard.replace('event:','')+' reports: '+ '; '.join(reports)+'. These are area reports, not hub incidents.'
+                    if coverage['excluded_locations']:answer+=' Locations without comparable scores: '+', '.join(coverage['excluded_locations'])+'.'
+                    data_errors=[dict(location_id=i,error='Insufficient comparable evidence') for i in coverage['excluded_locations']]
+                    if not data_errors:data_errors=[dict(location_id='',error='One or more selected hazards are unscored')]
+                warnings=[v['warning'] for v in comparison_result['hazards'].values() if v.get('warning')]
+                if warnings:answer+='\n\n'+' '.join(dict.fromkeys(warnings))
+                answer+='\n\nThis index uses frequency, severity and assumed recovery; it is not the probability of a shutdown.'
+                if len(ids)==2:answer=comparison_result['summaries'][period_key]
+                state['intent']=intent.model_dump(mode='json');state['last_answer']=answer
+                state['last_risk_results']=[];state['last_data_errors']=data_errors;state['last_comparison']=comparison_result
         elif intent.action=='winter_replay':
             if not state.get('scenario'):
                 answer='Supply a network in the scenario form, then ask for a winter replay. I will not invent facilities, capacities or backup links.'
@@ -204,9 +233,13 @@ class Service:
             if hasattr(self.weather,'fetch_group'):
                 registered=self.store.locations()
                 if not set(intent.location_ids)<=set(registered):raise ValueError('Unknown location ID')
-                if end<start or (end-start).days>6000 or start.year<1940:raise ValueError('Invalid or excessive weather period')
+                if end<start or (end-start).days>10957 or start.year<1940:raise ValueError('Invalid or excessive weather period')
                 requests={i:WeatherRequest(registered[i]['latitude'],registered[i]['longitude'],start,end,registered[i]['timezone']) for i in intent.location_ids}
-                snapshot=self.weather.fetch_group(requests,hazard=hazard)
+                selected=self.weather
+                if request.weather_source is not None:
+                    if not isinstance(self.weather,WeatherSources):raise ValueError('Weather source selection is not supported by this weather provider')
+                    selected=WeatherSources(primary=self.weather.primary,secondary=self.weather.secondary,source=request.weather_source)
+                snapshot=selected.fetch_group(requests,hazard=hazard)
             for loc in intent.location_ids:
                 try:
                     cards.append(self.weather_analysis(loc,start,end,hazard,intent.threshold,dataset=snapshot[loc] if snapshot is not None else None))
@@ -228,19 +261,24 @@ class Service:
             state['last_answer']=answer
             state['last_risk_results']=[]
             state['last_data_errors']=data_errors
+            state['last_comparison']=None
         planning=dict(mode=self.mode,model_plan=original_plan,applied_plan=intent.model_dump(mode='json'),policy_adjustments=adjustments,model_response=getattr(self.planner,'last_metadata',None))
         state['last_planning']=planning
         state['last_mode']=self.mode
         self.store.save(identifier,state)
-        return dict(conversation_id=identifier,answer=answer,cards=cards,risk_results=risk_results,scenario_result=scenario_result,mode=self.mode,data_errors=data_errors,result_status='partial' if data_errors else 'complete',planning=planning,model_config=(self.planner.config.public() if hasattr(self.planner,'config') else dict(provider='demo',model='deterministic-parser',configured=True)),intent=intent.model_dump(mode='json'),
+        return dict(conversation_id=identifier,answer=answer,cards=cards,risk_results=risk_results,comparison_result=comparison_result,scenario_result=scenario_result,mode=self.mode,data_errors=data_errors,result_status='partial' if data_errors else 'complete',planning=planning,model_config=(self.planner.config.public() if hasattr(self.planner,'config') else dict(provider='demo',model='deterministic-parser',configured=True)),intent=intent.model_dump(mode='json'),
                     notice='Demo parser; weather requests still use the real API/cache.' if self.mode=='demo' else 'AI selects a validated analysis; numerical answers are generated by code.')
 
     @staticmethod
     def describe(r):
         if r['exceedance_percent'] is None:return r['location_id']+': insufficient valid data.'
-        label={'snowfall_sum':'daily snowfall','precipitation_sum':'daily precipitation','temperature_2m_max':'daily maximum temperature','temperature_2m_min':'daily minimum temperature','wind_speed_10m_max':'daily maximum wind speed'}[r['variable']]
-        return (f"{r['location_id']}: {r['exceedance_days']} of {r['valid_days']} valid days ({r['exceedance_percent']:.2f}%) "
-                f"had {label} {r['operator']} {r['threshold']} {r['unit']} during {r['start']}–{r['end']}. "
-                f"Consecutive threshold days formed {r['observed_event_runs']} observed {'period' if r['observed_event_runs']==1 else 'periods'}; the longest lasted {r['longest_observed_run_days']} {'day' if r['longest_observed_run_days']==1 else 'days'}. "
-                f"Missing days: {r['missing_days']}. Trend: {r['trend'].get('direction','insufficient evidence')}. This is exposure, not predicted shutdown. "
-                f"Source: {r.get('evidence',{}).get('source','unspecified')}.")
+        label={'snowfall_sum':'snowfall','precipitation_sum':'heavy precipitation','temperature_2m_max':'hot weather','temperature_2m_min':'cold weather','wind_speed_10m_max':'strong winds'}[r['variable']]
+        name=r['location_id'].replace('_',' ').title()
+        start,end=r['start'][:4],r['end'][:4]
+        period=start if start==end and r['start'].endswith('01-01') and r['end'].endswith('12-31') else f"{r['start']} to {r['end']}"
+        qualifying='heavy snowfall' if r['variable']=='snowfall_sum' and r['threshold']>0 else label
+        answer=f"In {period}, {name} had {qualifying} on about {r['exceedance_percent']:.1f}% of days with available data."
+        if r['observed_event_runs']:
+            answer+=f" The longest consecutive period lasted {r['longest_observed_run_days']} {'day' if r['longest_observed_run_days']==1 else 'days'}."
+        if r['missing_days']:answer+=f" Some days are missing from the record ({r['missing_days']} days)."
+        return answer

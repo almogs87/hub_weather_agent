@@ -65,3 +65,7 @@ Official references checked 2 November 2026:
 The evaluation runner supports --delay-seconds 10 to pace requests for token-per-minute limits; the hidden-key launcher uses this pacing by default. Waiting time is excluded from each case latency.
 
 Live starter verification: openai/gpt-oss-20b passed 7/7 cases on 2 November 2026 with ten-second pacing and synthetic weather. A replay routing prompt clarification resolved the initial action mismatch. Report: eval-results/groq-live-paced-2026-11-02.json. Browser verification and second-model evaluation remain pending.
+
+## Cross-platform Python launcher
+
+Run `python scripts/start_live.py --port 8781` and enter a Groq key at the hidden prompt, or set GROQ_API_KEY before launching. On macOS or Linux use `python3` if that is your Python 3 executable. To evaluate, run `python scripts/start_live.py --action evaluate`. Optional flags: `--provider openai --model MODEL`, `--model MODEL`, `--weather-source auto|open-meteo|noaa`, and `--port PORT`. The process passes the key in its child environment, not command arguments or a file.

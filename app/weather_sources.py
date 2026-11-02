@@ -12,7 +12,11 @@ class WeatherSources:
 
     def fetch_group(self,requests,hazard='snow',refresh=False):
         if self.source=='open-meteo':
-            return {i:self.primary.fetch(r,refresh=refresh) for i,r in requests.items()}
+            results={}
+            for i,r in requests.items():
+                try:results[i]=self.primary.fetch(r,refresh=refresh)
+                except (RuntimeError,ValueError) as exc:results[i]=exc
+            return results
         failure=None
         if self.source=='auto':
             try:return {i:self.primary.fetch(r,refresh=refresh) for i,r in requests.items()}

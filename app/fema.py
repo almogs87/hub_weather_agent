@@ -8,7 +8,7 @@ from urllib.parse import urlencode
 from urllib.request import urlopen
 
 SERVICE = 'https://services.arcgis.com/XG15cJAlne2vxtgt/arcgis/rest/services/National_Risk_Index_Counties/FeatureServer/0/query'
-FIELDS = {'hurricane': 'HRCN_EALS', 'inland_flood': 'IFLD_EALS', 'coastal_flood': 'CFLD_EALS', 'winter': 'WNTW_EALS'}
+FIELDS = {'hurricane': 'HRCN_EALS', 'inland_flood': 'IFLD_EALS', 'coastal_flood': 'CFLD_EALS', 'winter': 'WNTW_EALS', 'ice_storm': 'ISTM_EALS', 'tornado': 'TRND_EALS', 'drought': 'DRGT_EALS'}
 
 class FEMAClient:
     def __init__(self, cache_dir='data/cache/fema', transport=None):
@@ -24,7 +24,7 @@ class FEMAClient:
         if not isinstance(county_fips, str) or len(county_fips) != 5 or not county_fips.isascii() or not county_fips.isdigit():
             raise ValueError('County FIPS must be five digits')
         url = SERVICE + '?' + urlencode({'where': "STCOFIPS='" + county_fips + "'", 'outFields': ','.join(['STCOFIPS', 'COUNTY', 'STATEABBRV', 'NRI_VER', *FIELDS.values()]), 'returnGeometry': 'false', 'f': 'json'})
-        path = self.cache_dir / (county_fips + '.json')
+        path = self.cache_dir / (county_fips + '-' + sha256(url.encode()).hexdigest()[:16] + '.json')
         if path.exists() and not refresh:
             envelope = json.loads(path.read_text(encoding='utf-8'))
             if envelope['url'] != url or sha256(envelope['raw'].encode('utf-8')).hexdigest() != envelope['sha256']:

@@ -13,18 +13,48 @@ class Location(StrictModel):
     timezone: str=Field(min_length=1,max_length=80)
 
 class Intent(StrictModel):
-    action: Literal['weather','compare','risk','winter_replay','explain','clarify','unsupported']
+    action: Literal['weather','compare','risk','capabilities','winter_replay','explain','clarify','unsupported']
     location_ids: list[str]
-    hazard: Literal['snow','heavy_precipitation','heat','cold','wind','winter','hurricane','flood','hurricane_flood','overall'] | None
+    hazard: Literal['snow','heavy_precipitation','heat','cold','wind','winter','hurricane','flood','hurricane_flood','overall','ice_storm','tornado','drought'] | None
     start: date | None
     end: date | None
     threshold: float | None
     question: str | None
 
+class IndexSettings(StrictModel):
+    weights: list[float]=Field(default=[50,25,25],min_length=3,max_length=3)
+    frequency_benchmark: float=Field(default=10,gt=0,le=10000)
+    recovery_benchmark: float=Field(default=14,gt=0,le=365)
+    recovery_days: list[float]=Field(default=[1,3,7],min_length=3,max_length=3)
+    bands: dict[str,list[float]]=Field(default_factory=dict)
+    event_benchmarks: dict[str,float]=Field(default_factory=lambda: {'hail_inches':3,'wind_knots':100})
+    @model_validator(mode='after')
+    def check_settings(self):
+        if any(x<0 for x in self.weights) or abs(sum(self.weights)-100)>0.01:raise ValueError('Weights must be nonnegative and sum to 100')
+        if any(x<0 or x>365 for x in self.recovery_days) or self.recovery_days!=sorted(self.recovery_days):raise ValueError('Recovery values must be ordered from 0 to 365 days')
+        if set(self.event_benchmarks)!={'hail_inches','wind_knots'} or any(value<=0 for value in self.event_benchmarks.values()):raise ValueError('Event severity benchmarks must be positive')
+        return self
+
 class ChatRequest(StrictModel):
     message: str=Field(min_length=1,max_length=4000)
     conversation_id: str | None=None
     scenario: dict | None=None
+    weather_source: Literal['auto','open-meteo','noaa'] | None=None
+    index_settings: IndexSettings | None=None
+
+class HubRankingRequest(IndexSettings):
+    locations: list[str] = Field(min_length=1,max_length=25)
+    hazards: list[str] = Field(min_length=1,max_length=60)
+    weather_source: Literal['auto','open-meteo','noaa']='auto'
+    @model_validator(mode='after')
+    def check_selection(self):
+        if len(set(self.locations))!=len(self.locations):raise ValueError('Choose distinct hubs')
+        if len(set(self.hazards))!=len(self.hazards):raise ValueError('Choose each hazard once')
+        return self
+
+class HubComparisonRequest(HubRankingRequest):
+    locations: list[str] = Field(min_length=2,max_length=2)
+    selected_period: Literal[5,10,20,30]=10
 
 class HubInput(StrictModel):
     id: str

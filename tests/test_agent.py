@@ -9,6 +9,7 @@ from app.storage import Store
 from app.server import dispatch
 from app.weather import UNITS
 from app.winter import snowfall_disruptions, WinterProfile
+from app.weather_sources import WeatherSources
 
 class FakeWeather:
     def fetch(self,request):
@@ -31,10 +32,29 @@ class AgentTests(unittest.TestCase):
     def test_schema_rejects_unknown_fields(self):
         with self.assertRaises(ValueError):Intent.model_validate(dict(action='weather',location_ids=[],hazard='snow',start=None,end=None,threshold=None,question=None,execute_code='oops'))
 
+    def test_source_override_is_per_request_and_capabilities_need_no_model(self):
+        class Primary(FakeWeather):
+            def fetch(self,request,refresh=False):
+                result=super().fetch(request);result['evidence']['source']='ERA5';return result
+        class Secondary(FakeWeather):
+            def fetch(self,request,hazard,refresh=False):
+                result=super().fetch(request);result['evidence']['source']='NOAA';return result
+        sources=WeatherSources(Primary(),Secondary(),'auto')
+        self.service.weather=sources
+        selected=self.service.chat(dict(message='Snow for siteA in 2025',weather_source='noaa'))
+        self.assertEqual(selected['cards'][0]['evidence']['source'],'NOAA')
+        self.assertEqual(sources.source,'auto')
+        normal=self.service.chat(dict(message='Snow for siteA in 2025',weather_source='open-meteo'))
+        self.assertEqual(normal['cards'][0]['evidence']['source'],'ERA5')
+        self.service.planner=lambda *args: (_ for _ in ()).throw(RuntimeError('model called'))
+        capability=self.service.chat(dict(message='What weather events do you support?'))
+        self.assertEqual(capability['intent']['action'],'capabilities')
+        self.assertIn('NOAA',capability['answer'])
+
     def test_snow_periods_and_demo_limitations(self):
         result=self.service.chat(dict(message='Heavy snow for siteA in 2025'))
-        self.assertIn('1 observed period',result['answer'])
-        self.assertIn('> 15',result['answer'])
+        self.assertIn('heavy snowfall',result['answer'])
+        self.assertEqual(result['cards'][0]['threshold'],15)
         depth=self.service.chat(dict(message='Snow depth for siteA in 2025'))
         self.assertIn('not available',depth['answer'])
         custom=self.service.chat(dict(message='Snow over 20 cm for siteA in 2025'))
@@ -63,7 +83,7 @@ class AgentTests(unittest.TestCase):
 
     def test_compare_and_explain(self):
         r=self.service.chat(dict(message='Compare siteB and siteA snow 2025'))
-        self.assertEqual([c['location_id'] for c in r['cards']],['siteA','siteB'])
+        self.assertEqual(set(r['comparison_result']['overall']['1']),{'siteA','siteB'})
         follow=self.service.chat(dict(message='Why?',conversation_id=r['conversation_id']))
         self.assertIn('deterministic',follow['answer'])
 
@@ -164,15 +184,17 @@ class AgentTests(unittest.TestCase):
         self.assertEqual(result['cards'][0]['threshold'],15)
 
     def test_failed_location_does_not_hide_available_comparison(self):
-        original=self.service.weather_analysis
-        def selective(location,*args,**kwargs):
-            if location=='siteB':raise RuntimeError('Weather data for siteB: HTTP 503')
-            return original(location,*args,**kwargs)
-        self.service.weather_analysis=selective
+        class Selective(FakeWeather):
+            def fetch(self,request):
+                if request.latitude==41:raise RuntimeError('HTTP 503')
+                return super().fetch(request)
+        self.service.add_location(dict(id='siteB',latitude=41,longitude=-105,timezone='UTC'))
+        self.service.weather=Selective()
         result=self.service.chat(dict(message='Compare snow for siteA and siteB in 2025'))
         self.assertEqual(result['result_status'],'partial')
-        self.assertEqual([c['location_id'] for c in result['cards']],['siteA'])
+        self.assertIsNotNone(result['comparison_result']['overall']['1']['siteA'])
+        self.assertIsNone(result['comparison_result']['overall']['1']['siteB'])
         self.assertEqual(result['data_errors'][0]['location_id'],'siteB')
-        self.assertIn('no complete ranking',result['answer'])
+        self.assertIn('partial comparison',result['answer'])
 
 if __name__=='__main__':unittest.main()

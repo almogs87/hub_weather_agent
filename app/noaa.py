@@ -71,11 +71,13 @@ def eligible_inventory(text,element,start_year,end_year,station_ids):
     return eligible
 
 class NOAAClient:
-    def __init__(self,cache_dir='data/cache/noaa',transport=None,max_candidates=16,radius_km=100):
+    def __init__(self,cache_dir='data/cache/noaa',transport=None,max_candidates=16,radius_km=100,min_coverage=.95):
         self.cache_dir=Path(cache_dir)
         self.transport=transport or WeatherClient.download
         self.max_candidates=max_candidates
         self.radius_km=radius_km
+        if not 0<min_coverage<=1:raise ValueError('Invalid minimum coverage')
+        self.min_coverage=min_coverage
 
     def raw(self,url,refresh=False):
         path=self.cache_dir/(sha256(url.encode()).hexdigest()+'.json')
@@ -109,8 +111,8 @@ class NOAAClient:
                 envelope,cached=self.raw(BASE+'all/'+station['id']+'.dly',refresh)
                 rows=parse_daily(envelope['text'],station['id'],request)
                 completeness=sum(r[variable] is not None for r in rows)/len(rows)
-                if completeness<.95:
-                    rejected.append(station['id']+f': {completeness:.1%} {variable} coverage (requires 95%)')
+                if completeness<self.min_coverage:
+                    rejected.append(station['id']+f': {completeness:.1%} {variable} coverage (requires {self.min_coverage:.0%})')
                     continue
                 return dict(rows=rows,evidence=dict(source='NOAA NCEI GHCN-Daily',model='station observations',dataset_family='noaa-ghcn-daily',
                     day_basis='station-reported observation date',station=station,requested_coordinates=[request.latitude,request.longitude],
@@ -118,9 +120,9 @@ class NOAAClient:
                     request_url=envelope['url'],catalog_url=catalog['url'],catalog_sha256=catalog['sha256'],inventory_url=inventory['url'],inventory_sha256=inventory['sha256'],requested_variable_completeness=completeness,
                     retrieved_at=envelope['retrieved_at'],source_id='noaa:'+envelope['sha256'],content_sha256=envelope['sha256'],cache_hit=cached,
                     analysis_start=request.start.isoformat(),analysis_end=request.end.isoformat(),units=UNITS,
-                    selection=f'Nearest station within {self.radius_km} km among up to {self.max_candidates} inventory-eligible candidates with 95% actual coverage',
+                    selection=f'Nearest station within {self.radius_km} km among up to {self.max_candidates} inventory-eligible candidates with {self.min_coverage:.0%} actual coverage',
                     nearby_station_count=nearby_count,inventory_eligible_count=len(candidates),
                     rejected_candidates=rejected,
                     limitation='Station observation periods may differ from local midnight days; elevation and distance affect representativeness. Quality-flagged/missing values excluded. Trace snowfall counts as zero at reported precision. Wind maximum unsupported.'))
             except (RuntimeError,ValueError) as exc:rejected.append(station['id']+': '+str(exc))
-        raise RuntimeError('NOAA found no suitable station within '+str(self.radius_km)+' km with at least 95% coverage; '+('; '.join(rejected) if rejected else f'{nearby_count} nearby stations, {len(candidates)} inventory-eligible for {element} in {request.start.year}-{request.end.year}'))
+        raise RuntimeError('NOAA found no suitable station within '+str(self.radius_km)+f' km with at least {self.min_coverage:.0%} coverage; '+('; '.join(rejected) if rejected else f'{nearby_count} nearby stations, {len(candidates)} inventory-eligible for {element} in {request.start.year}-{request.end.year}'))

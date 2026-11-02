@@ -127,3 +127,25 @@ FEMA follow-up handling and evaluation coverage were extended. All 76 unit tests
 ## HTTP integration checkpoint
 
 The four assignment questions were exercised through the local demo HTTP API with real cached sources. A pre-existing Chicago record originally prevented example region metadata from being seeded; exact location matches now gain missing metadata, and conflicting user locations are preserved with a separately named example. Midwest results now include Chicago, Detroit and Minneapolis. The other examples returned expected results, with Dallas explicitly partial. All 77 unit tests and 14 demo evaluations pass. Browser access host remains unavailable; expanded live Groq evaluation requires a configured key.
+
+## User-selectable source and expanded hazards
+
+Historical chat now accepts per-request source selection (auto, Open-Meteo ERA5, NOAA); the browser has a selector and comparisons remain source-consistent. Capability questions have a deterministic response. FEMA county screening now includes ice storms, tornadoes and drought; it reports relative county expected-loss scores, not recorded event counts. Live FEMA data for seven examples and cached NOAA/ERA5 chat paths were checked. All 82 unit tests and 14 demo evaluations pass. Browser visual and expanded live Groq validation remain open.
+
+## Chat and map redesign
+
+The active hub catalog is now app/hubs.json; stored SQLite locations remain untouched but inactive. The chat scrolls above the composer with examples below, user messages are light blue, and a contiguous-US hub map appears below. Weather answers are concise with per-answer expandable evidence; scenario APIs remain available but their UI forms are removed. The local boundaries use Natural Earth data. 84 unit tests and 14 demo evaluations pass; HTTP endpoints and cached Denver weather were verified. The browser access host was unavailable for visual/mobile inspection; expanded live Groq testing remains pending.
+
+## Two-hub comparison implementation
+
+Added 25 labeled illustrative hubs, a compact map and two-hub selection tray, hazard selection, editable scoring assumptions and a 5/10/20/30-year comparison API. The NOAA Storm Events adapter lists 48 standard types and scores hail, measured wind and EF-rated tornado records only where physical severity is available; all others remain unscored. NOAA state fallback and geographic-scope differences are prominent. Daily weather comparisons use 80% coverage and per-period source provenance. A live Chicago/Denver daily comparison succeeded for all four periods; five-year and 30-year NOAA hail archive checks succeeded, including a Chicago county/Dallas state mismatch warning. All 89 tests and 14 demo evaluations pass. Visual browser and expanded live Groq tests remain open.
+
+## Shared chat and table index
+
+Chat risk and comparison questions now call the same planning index engine as the two-hub table with the selected weights, severity bands, recovery assumptions and weather source. The default is the latest 10 complete years; all seven Midwest catalog locations are included. A live-data demo request completed with seven scored snowfall results and separately labeled unscored statewide ice-storm reports. The two-hub UI now displays a side-by-side table, restricts visible named hazards to core major events and offers advanced settings. A portable hidden-key Python launcher is available at scripts/start_live.py. Automated tests and demo evaluations pass. Expanded live Groq and visual browser verification remain pending.
+
+## Simplified two-location comparisons
+
+Map and list clicks toggle up to two locations. A shared event and period drive the prepared chat question and the full four-period table; reset preserves the chat and previous result. The table prioritizes scores and NOAA report counts, with supporting details expandable. Chat and table use the same deterministic summary and cautiously explain incomplete or geographically mismatched reports. Trend statements use annual planning indexes only when the existing 15-year and coverage requirements are met. All 97 unit tests and 14 demo evaluations pass. Visual browser and expanded live-model verification remain open.
+
+NOAA storm-event lookup now falls back to validated cached annual archives when the directory listing is unavailable, preserving actual year coverage and per-file provenance. An offline 2016?2025 Miami/Houston check returned county flood and flash-flood counts and statewide hurricane reports; those statewide counts cannot establish hub-level hurricane risk. 98 unit tests and 14 demo evaluations pass.

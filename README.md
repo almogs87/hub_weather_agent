@@ -1,6 +1,8 @@
 # Weather Risk Intelligence Agent
 
-A local conversational analyst for historical weather exposure and county-level natural hazard screening. Seven city-based hubs are illustrative examples, not actual company facilities.
+For the project story, decisions, lessons and next steps, see the [project handover](docs/project-handover.md).
+
+A local conversational analyst for historical weather exposure and reported weather events. The catalog contains 25 illustrative city locations, including seven example existing hubs; none are verified company facilities.
 
 ## Run
 
@@ -12,21 +14,17 @@ python -m pip install -r requirements.txt
 python -m app.server --demo
 ~~~
 
-Open http://127.0.0.1:8000 . Demo mode uses a limited deterministic question parser, not an LLM; weather still comes from the real API or its cache. No synthetic weather is substituted in the application. The app seeds illustrative hubs automatically; optionally add candidate coordinates and an IANA timezone, then ask using that location's ID, e.g. 'Snow exposure for my-site in 2025', followed by 'What about heat?'. Demo parsing only recognizes simple location IDs, years and hazard words; it is for checking the interface.
+Open http://127.0.0.1:8000 . Demo mode uses a limited deterministic question parser, not an LLM; weather still comes from the real API or its cache. No synthetic weather is substituted in the application. The app loads illustrative hubs from app/hubs.json; ask using a hub ID, e.g. 'Snow for denver in 2025', followed by 'What about heat?'. Demo parsing only recognizes simple location IDs, years and hazard words; it is for checking the interface.
 
-For AI mode, Groq is the default provider (openai/gpt-oss-20b). Use scripts/start-live.ps1 to enter a Groq key with hidden input, or securely set GROQ_API_KEY and optionally LLM_PROVIDER/LLM_MODEL. For OpenAI set LLM_PROVIDER=openai, OPENAI_API_KEY and LLM_MODEL. Then run:
+For AI mode, Groq is the default provider (openai/gpt-oss-20b). Run `python scripts/start_live.py` on Windows, macOS or Linux to enter a Groq key with hidden input, or securely set GROQ_API_KEY and optionally LLM_PROVIDER/LLM_MODEL. The launcher starts the server itself; open the address it prints. Alternatively, configure the provider, model and API key in your environment and run `python -m app.server` directly.
 
-~~~powershell
-python -m app.server
-~~~
+The example .env file is not auto-loaded. Never commit API keys or paste them into a chat. An AI call is made only when live-mode chat is submitted. An earlier seven-case Groq planning evaluation passed; expanded live-model and current-interface end-to-end checks remain pending. Provider refusal, incomplete output or invalid schema cannot execute an analysis.
 
-The example .env file is not auto-loaded. Never commit API keys or paste them into a chat. An AI call is made only when live-mode chat is submitted. Real model integration is implemented but has not been tested with live credentials. Provider refusal, incomplete output or invalid schema cannot execute an analysis.
-
-The model selects an approved analysis through a strict schema: Groq returns a structured plan; OpenAI returns a function call. Python validates that call and computes every number. Explanations are deterministic templates grounded in returned metrics, preventing narrative arithmetic drift. Conversation context and registered locations persist in SQLite. Use New conversation to clear the active context.
+The model selects an approved analysis through a strict schema: Groq returns a structured plan; OpenAI returns a function call. Python validates that call and computes every number. Explanations are deterministic templates grounded in returned metrics, preventing narrative arithmetic drift. Conversation context persists in SQLite; the active hub catalog is loaded from app/hubs.json on server startup. Use New conversation to clear the active context.
 
 ## Winter replay
 
-Paste an explicit network into the page's scenario form, map hubs to registered location IDs, and select Run replay. Alternatively leave the JSON in that form and ask 'Run a winter replay'; the chat request includes the supplied network and stores it in that conversation. Follow-up replay requests reuse that network. No capacities or links are invented.
+Submit an explicit network to POST /api/scenarios/replay, mapping hubs to IDs in app/hubs.json. The replay API remains available, but its form is no longer shown in the chat interface. No capacities or links are invented.
 
 ~~~json
 {
@@ -65,14 +63,14 @@ python -m evals.run
 python -m evals.run --live-model
 ~~~
 
-77 tests pass; 14 conversation evaluation cases pass with the demo parser and explicit synthetic weather and FEMA data. --live-model calls the configured real LLM while retaining synthetic data, isolating planning quality from network/data variation. It requires credentials and may incur provider charges. The earlier seven-case live evaluation passed; the expanded 14-case evaluation remains pending.
+98 tests pass; 14 conversation evaluation cases pass with the demo parser and explicit synthetic weather and NOAA event data. --live-model calls the configured real LLM while retaining synthetic data, isolating planning quality from network/data variation. It requires credentials and may incur provider charges. The earlier seven-case live evaluation passed; the expanded 14-case evaluation remains pending.
 
 Headless browser checks passed using isolated synthetic weather: registration, snowfall analysis, heat follow-up, table sorting, network replay, and a 390px mobile layout without page overflow. Live historical weather was independently verified by the user from PowerShell. The earlier seven-case live model evaluation passed; the current interface and expanded schema still need an end-to-end live browser check.
 
 ## API
 
 - GET /api/health: readiness, mode, configuration presence (no credentials).
-- GET/POST /api/locations: list/register coordinates.
+- GET /api/locations: list the JSON hub catalog.
 - GET /api/profile: profile, assumptions and source references.
 - POST /api/chat: message, optional conversation_id and optional scenario; returns answer, metric cards, intent and optional scenario_result.
 - POST /api/scenarios/replay: explicit network JSON; returns daily allocation, losses, recovery and evidence.
@@ -93,7 +91,7 @@ Runtime SQLite and weather caches live under data/ and are ignored by Git. Cache
 
 ## Remaining scope
 
-Population-based national coverage, automatic facility optimization, facility-level flood/hurricane evidence, actual transport-closure data, shipment backlog, voice, alerts and deployment are not implemented. Coordinates can be registered throughout the US, but that does not demonstrate nationwide coverage. Mainland, Alaska and Hawaii are separate service components in scenario inputs; the system does not infer a component from coordinates.
+Population-based national coverage, automatic facility optimization, facility-level flood/hurricane evidence, actual transport-closure data, shipment backlog, voice, alerts and deployment are not implemented. The sample hubs and contiguous-US map do not demonstrate nationwide coverage. Mainland, Alaska and Hawaii are separate service components in scenario inputs; the system does not infer a component from coordinates.
 
 The mandatory full AI-development-session export remains outstanding; a design summary is not a substitute. See docs/architecture.md and docs/assumptions.md.
 
@@ -103,9 +101,9 @@ Track completed work and next steps in docs/progress.md. Replay now includes sum
 
 ## Compare networks
 
-Use the replay Scenario JSON as the reference, then supply Candidate network JSON in Compare networks. The API POST /api/scenarios/compare enforces equal demand, dates and distance limits; shared hubs retain weather location/component. Each unique weather location is fetched once and reused for both networks. Results show service benefits and costs in additional installed capacity/distance, without assuming that backups escape regional storms. Distance comparison matches the smaller served quantity per demand area/day so reduced service cannot masquerade as shorter transport. No monetary costs or automatic investment recommendation. See docs/network-comparison-test.md for a complete manual test.
+Use the API POST /api/scenarios/compare with reference and candidate networks. It enforces equal demand, dates and distance limits; shared hubs retain weather location/component. Each unique weather location is fetched once and reused for both networks. Results show service benefits and costs in additional installed capacity/distance, without assuming that backups escape regional storms. Distance comparison matches the smaller served quantity per demand area/day so reduced service cannot masquerade as shorter transport. No monetary costs or automatic investment recommendation. See docs/network-comparison-test.md for a complete manual test.
 
-Provider and model configuration, hidden-key startup, switching examples and evaluation gates are documented in docs/model-providers.md. No real Groq request has yet been verified with credentials.
+Provider and model configuration, hidden-key startup, switching examples and evaluation gates are documented in docs/model-providers.md. An earlier seven-case live Groq evaluation passed; the expanded evaluation remains pending.
 
 Each successful chat answer now includes a collapsed How this answer was produced trace: original model plan, applied policy, response ID/usage when supplied by the provider, and per-location weather cache provenance. Named heavy snow is enforced as the documented illustrative >15 cm/day metric unless an explicit numeric custom amount is supplied. The model plans; deterministic templates produce numerical explanations, so the same query should return the same values in live and demo mode. Weather retrieval retries transient connectivity/502/503/504 errors up to three attempts; access-denied and certificate errors are not retried.
 
@@ -119,4 +117,16 @@ NOAA station selection uses the official element/year inventory before checking 
 
 ## County hazard screening
 
-The app seeds illustrative Chicago, Detroit, Minneapolis, Miami, Houston, Denver and Dallas hubs on server startup without overwriting existing user locations. FEMA National Risk Index county-level expected annual loss scores provide screening context for winter weather, hurricanes, inland flooding and coastal flooding. Scores are relative county measures, not facility downtime or an event probability. Data is fetched from the public FEMA county feature service and cached with its dataset version, timestamp and response hash. Missing scores remain unavailable; Dallas County lacks a coastal-flood score in the retrieved December 2025 data, so its overall screening is explicitly partial. Actual facilities and their vulnerabilities require separate evidence.
+The app loads 25 illustrative locations from app/hubs.json, including seven example existing hubs; old saved locations remain untouched but inactive. Chat and table comparisons use the same planning index and NOAA event reports. When there is not enough data to calculate a score, the comparison shows available NOAA report counts and explains their limits. NOAA county/state reports are not facility downtime or an event probability. Actual facilities and their vulnerabilities require separate evidence.
+
+## Hub catalog and map
+
+Edit app/hubs.json and restart the server to change the active locations. Entries need unique IDs, labels, coordinates, timezone, state, region and county FIPS. Existing SQLite locations are preserved but inactive. The map shows hub coordinates, not service coverage; Alaska and Hawaii are not displayed. The locally served state boundaries are from Natural Earth (public domain): https://www.naturalearthdata.com/about/terms-of-use/ .
+
+## Compare two hubs
+
+Use the compact map to select up to two illustrative locations, one weather event and a time period. Compare in chat prepares a question for review; Full comparison table displays all four periods. Reset locations retains the conversation and previous table. The comparison displays frequency, severity, illustrative recovery and a non-probabilistic planning index for the last 5, 10, 20 and 30 complete years. Source data, coverage and geographic limitations are shown with results. Severity, frequency and recovery benchmarks and weights are editable. The NOAA storm archive can take several minutes and substantial disk space on first use. Full details and assumptions: docs/example-questions.md.
+
+## Portable live launcher
+
+Run `python scripts/start_live.py` to use Groq. The key is read from `GROQ_API_KEY` if set, otherwise prompted without echo and passed only to the child process. Add `--port 8767`, `--weather-source noaa`, `--model MODEL`, or `--action evaluate` as needed. For OpenAI use `--provider openai --model MODEL`. The launcher does not save the key.

@@ -17,7 +17,9 @@ def dispatch(service,path,payload):
         from .comparison import compare_networks
         return compare_networks(service,payload)
     if path=='/api/chat':return service.chat(payload)
-    if path=='/api/locations':return service.add_location(payload)
+    if path=='/api/hub-comparison':
+        from .hub_comparison import compare_hubs
+        return compare_hubs(service,payload)
     if path=='/api/scenarios/replay':return service.replay(payload)
     raise KeyError('Unknown endpoint')
 
@@ -37,15 +39,20 @@ def make_handler(service,port):
             self.wfile.write(raw)
         def do_GET(self):
             if self.path=='/api/health':
-                return self.send_json(200,dict(status='ok',mode=service.mode,llm_configured=ModelConfig.load().public()['configured'],model_config=ModelConfig.load().public(),weather_source=os.environ.get('WEATHER_SOURCE','auto')))
+                return self.send_json(200,dict(status='ok',mode=service.mode,llm_configured=ModelConfig.load().public()['configured'],model_config=ModelConfig.load().public(),weather_source=os.environ.get('WEATHER_SOURCE','auto'),chat_weather_source_selection=True,comparison_ui_version=2))
             if self.path=='/api/locations':return self.send_json(200,list(service.store.locations().values()))
+            if self.path=='/api/comparison-options':
+                from datetime import datetime,timezone
+                from .storm_events import EVENT_TYPES
+                from .hub_comparison import BANDS
+                return self.send_json(200,dict(daily_hazards=BANDS,noaa_event_types=EVENT_TYPES,periods=[5,10,20,30],last_complete_year=datetime.now(timezone.utc).year-1,open_meteo_catalog_url='https://open-meteo.com/en/docs/historical-weather-api',catalog_note='The provider documents additional variables; only the daily hazards listed here are scored.'))
             if self.path=='/api/profile':return self.send_json(200,WinterProfile().describe())
-            files={'/':'index.html','/app.js':'app.js','/style.css':'style.css'}
+            files={'/':'index.html','/app.js':'app.js','/style.css':'style.css','/us-states.json':'us-states.json'}
             if self.path not in files:return self.send_json(404,dict(error='Not found'))
             path=STATIC/files[self.path]
             raw=path.read_bytes()
             self.send_response(200)
-            self.send_header('Content-Type',{'html':'text/html; charset=utf-8','js':'text/javascript; charset=utf-8','css':'text/css; charset=utf-8'}[path.suffix[1:]])
+            self.send_header('Content-Type',{'html':'text/html; charset=utf-8','js':'text/javascript; charset=utf-8','css':'text/css; charset=utf-8','json':'application/json; charset=utf-8'}[path.suffix[1:]])
             self.send_header('Content-Length',str(len(raw)))
             self.send_header('Content-Security-Policy',"default-src 'self'; script-src 'self'; style-src 'self'; connect-src 'self'; frame-ancestors 'none'")
             self.send_header('X-Content-Type-Options','nosniff')
@@ -81,9 +88,9 @@ def main():
     p.add_argument('--port',type=int,default=8000)
     p.add_argument('--demo',action='store_true')
     args=p.parse_args()
-    service=Service(mode='demo' if args.demo else 'live')
-    from .hubs import seed_examples
-    seed_examples(service.store)
+    from .hubs import load_hubs
+    from .storage import Store
+    service=Service(store=Store(catalog=load_hubs()),mode='demo' if args.demo else 'live')
     server=ThreadingHTTPServer(('127.0.0.1',args.port),make_handler(service,args.port))
     print(f'Open http://127.0.0.1:{args.port} | mode: {service.mode}',flush=True)
     try:server.serve_forever()

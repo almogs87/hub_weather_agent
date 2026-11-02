@@ -1,4 +1,27 @@
 """Illustrative city hubs, not actual company facilities."""
+import json
+import re
+from pathlib import Path
+from zoneinfo import ZoneInfo
+from .schemas import Location
+
+CATALOG_PATH=Path(__file__).with_name('hubs.json')
+
+def load_hubs(path=CATALOG_PATH):
+    """Validate the full catalog before exposing any hubs."""
+    raw=json.loads(Path(path).read_text(encoding='utf-8'))
+    if not isinstance(raw,list) or not raw:raise ValueError('Hub catalog must be a non-empty list')
+    result={}
+    for hub in raw:
+        if not isinstance(hub,dict):raise ValueError('Invalid hub catalog entry')
+        location=Location.model_validate({key:hub.get(key) for key in ('id','latitude','longitude','timezone')})
+        ZoneInfo(location.timezone)
+        if location.id in result:raise ValueError('Duplicate hub ID: '+location.id)
+        if not isinstance(hub.get('label'),str) or not hub['label'].strip():raise ValueError('Hub label is required')
+        if hub.get('status') not in ('existing','optional'):raise ValueError('Hub status must be existing or optional')
+        if not isinstance(hub.get('state'),str) or not re.fullmatch(r'[A-Z]{2}',hub['state']) or not isinstance(hub.get('region'),str) or not hub['region'].strip() or not isinstance(hub.get('county_fips'),str) or not re.fullmatch(r'\d{5}',hub['county_fips']):raise ValueError('Invalid hub state, region, or county FIPS')
+        result[location.id]=dict(hub)
+    return result
 EXAMPLE_HUBS = [
     dict(id='chicago', latitude=41.8781, longitude=-87.6298, timezone='America/Chicago', state='IL', region='Midwest', county_fips='17031'),
     dict(id='detroit', latitude=42.3314, longitude=-83.0458, timezone='America/Detroit', state='MI', region='Midwest', county_fips='26163'),

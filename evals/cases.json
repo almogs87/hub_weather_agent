@@ -39,9 +39,13 @@
     "locations": [
       "chicago",
       "detroit",
-      "minneapolis"
+      "minneapolis",
+      "kansas_city",
+      "st_louis",
+      "indianapolis",
+      "columbus"
     ],
-    "risk_count": 3,
+    "risk_count": 7,
     "new_conversation": true
   },
   {

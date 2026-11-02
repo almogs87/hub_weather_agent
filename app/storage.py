@@ -5,8 +5,9 @@ import sqlite3
 from uuid import uuid4
 
 class Store:
-    def __init__(self,path='data/app.sqlite3'):
+    def __init__(self,path='data/app.sqlite3',catalog=None):
         self.path=str(path)
+        self.catalog=catalog
         Path(path).parent.mkdir(parents=True,exist_ok=True)
         with self.connect() as db:
             db.execute('CREATE TABLE IF NOT EXISTS conversations (id TEXT PRIMARY KEY, state TEXT NOT NULL)')
@@ -23,6 +24,7 @@ class Store:
         finally:
             db.close()
     def locations(self):
+        if self.catalog is not None:return {key:dict(value) for key,value in self.catalog.items()}
         with self.connect() as db:
             return {i:json.loads(p) for i,p in db.execute('SELECT id,payload FROM locations ORDER BY id')}
     def add_location(self,location):

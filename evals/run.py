@@ -8,7 +8,7 @@ from time import perf_counter,sleep
 from app.agent import Service
 from app.storage import Store
 from app.providers import ModelConfig
-from app.hubs import seed_examples
+from app.hubs import load_hubs
 
 class EvaluationWeather:
     def fetch(self,request):
@@ -25,8 +25,13 @@ class EvaluationFEMA:
         values={'17031':90,'26163':70,'27053':80,'12086':85,'48201':95,'48113':60,'08031':40,'99999':50}
         score=values[county_fips]
         return dict(county_fips=county_fips,county='Synthetic',state='XX',
-                    scores=dict(winter=score,hurricane=score,inland_flood=score,coastal_flood=score),
+                    scores=dict(winter=score,hurricane=score,inland_flood=score,coastal_flood=score,ice_storm=score,tornado=score,drought=score),
                     evidence=dict(source_id='fixture:evaluation-fema',source='Synthetic FEMA evaluation data'))
+
+class EvaluationStorm:
+    """Unscored synthetic reports, independent of network access."""
+    def compare(self,locations,identifiers,hazards,end_year,periods,*args):
+        return {hazard:dict(kind='reported_event',warning='Synthetic county reports',hubs={identifier:dict(status='available',evidence=dict(source='Synthetic storm events',source_id='fixture:storm'),periods={str(n):dict(status='unscored',index=None,event_reports=2,periods_per_year=2/n,archive_years_available=n,requested_years=n,coverage=1,average_severity_score=None,assumed_average_recovery_days=None,geographic_scope='county') for n in periods}) for identifier in identifiers}) for hazard in hazards}
 
 def main():
     p=argparse.ArgumentParser(description=__doc__)
@@ -39,10 +44,11 @@ def main():
     config=ModelConfig.load().public() if args.live_model else dict(provider='demo',model='deterministic-parser',configured=True)
     results=[]
     with tempfile.TemporaryDirectory() as directory:
-        service=Service(Store(directory+'/eval.db'),EvaluationWeather(),mode='live' if args.live_model else 'demo',fema=EvaluationFEMA())
-        seed_examples(service.store)
+        catalog=load_hubs()
         for identifier in ['siteA','siteB']:
-            service.store.add_location(dict(id=identifier,latitude=40,longitude=-105,timezone='UTC',county_fips='99999'))
+            catalog[identifier]=dict(id=identifier,latitude=40,longitude=-105,timezone='UTC',county_fips='99999')
+        service=Service(Store(directory+'/eval.db',catalog=catalog),EvaluationWeather(),mode='live' if args.live_model else 'demo',fema=EvaluationFEMA())
+        service.storm_events=EvaluationStorm()
         conversation=None
         for case in cases:
             if results and args.delay_seconds:sleep(args.delay_seconds)
@@ -67,8 +73,7 @@ def main():
                 if response.get('risk_results'):
                     assert all(r['evidence']['source_id']=='fixture:evaluation-fema' for r in response['risk_results']),'Missing county evidence'
                 if case.get('risk_count') is not None:
-                    assert len(response.get('risk_results',[]))==case['risk_count'],'Wrong risk result count'
-                    assert response['result_status']=='complete','Risk result incomplete'
+                    assert len(response.get('comparison_result',{}).get('locations',[]))==case['risk_count'],'Wrong comparison location count'
                 item['passed']=True
                 print('PASS',case['message'])
             except Exception as exc:
@@ -77,7 +82,7 @@ def main():
             item['latency_seconds']=round(perf_counter()-began,3)
             results.append(item)
     passed=sum(r['passed'] for r in results)
-    report=dict(created_at=datetime.now(timezone.utc).isoformat(),model_config=config,weather='synthetic evaluation fixtures',hazards='synthetic county fixtures',passed=passed,total=len(cases),cases=results)
+    report=dict(created_at=datetime.now(timezone.utc).isoformat(),model_config=config,weather='synthetic evaluation fixtures',hazards='synthetic NOAA storm event fixtures',passed=passed,total=len(cases),cases=results)
     if args.report:
         args.report.parent.mkdir(parents=True,exist_ok=True)
         args.report.write_text(json.dumps(report,indent=2),encoding='utf-8')
