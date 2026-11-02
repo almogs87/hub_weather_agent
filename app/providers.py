@@ -3,6 +3,7 @@ from dataclasses import dataclass
 from datetime import datetime,timezone
 import json
 import os
+import re
 from urllib.request import Request,urlopen
 from urllib.error import HTTPError,URLError
 from .schemas import Intent
@@ -46,12 +47,28 @@ def planning_input(message,state,locations):
     return prompt,data
 
 def request_json(url,body,key,provider):
-    request=Request(url,data=json.dumps(body).encode(),headers={'Authorization':'Bearer '+key,'Content-Type':'application/json'})
+    request=Request(url,data=json.dumps(body).encode(),headers={'Authorization':'Bearer '+key,'Content-Type':'application/json','Accept':'application/json','User-Agent':'hub-weather-agent/0.1'})
     try:
         with urlopen(request,timeout=60) as response:return json.load(response)
     except HTTPError as exc:
         advice={401:'Check the API key.',403:'Check account and model access.',429:'Free-tier rate or token quota reached; wait before retrying.',400:'Check model support for the strict schema.'}.get(exc.code,'Retry later or check provider status.')
-        raise RuntimeError(f'{provider} model request failed (HTTP {exc.code}). {advice}') from exc
+        # Preserve provider diagnostics, never credentials or entire HTML pages.
+        detail=''
+        try:
+            raw=exc.read(8192).decode('utf-8',errors='replace')
+            payload=json.loads(raw)
+            error=payload.get('error',{})
+            if isinstance(error,dict):
+                detail=' | '.join(str(error[k]) for k in ('code','type','message') if error.get(k))
+            elif isinstance(error,str):detail=error
+        except (ValueError,AttributeError,OSError):
+            if 'raw' in locals() and '1010' in raw:
+                detail='Upstream access filter rejected this HTTP client (1010); not a confirmed model permission error.'
+        detail=detail.replace(key,'[REDACTED]')
+        detail=re.sub(r'\b(?:gsk_[A-Za-z0-9_-]+|sk-[A-Za-z0-9_-]+)', '[REDACTED]', detail)
+        detail=' '.join(detail.split())[:600]
+        suffix=' Provider detail: '+detail if detail else ''
+        raise RuntimeError(f'{provider} model request failed (HTTP {exc.code}). {advice}'+suffix) from exc
     except (URLError,TimeoutError,OSError) as exc:
         raise RuntimeError(f'{provider} model connection failed. Check network access; no fallback provider was used.') from exc
 

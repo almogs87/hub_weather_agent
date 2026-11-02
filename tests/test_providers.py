@@ -1,4 +1,5 @@
 import json
+from io import BytesIO
 import os
 import unittest
 from unittest.mock import patch
@@ -53,5 +54,19 @@ class ProviderTests(unittest.TestCase):
         with patch.dict(os.environ,{'GROQ_API_KEY':'test'},clear=True),patch('app.providers.urlopen',side_effect=error) as mock:
             with self.assertRaisesRegex(RuntimeError,'quota'):GroqPlanner()('snow',{}, {})
             self.assertEqual(mock.call_count,1)
+
+    def test_permission_details_are_preserved_and_key_redacted(self):
+        body=dict(error=dict(code='model_permission_blocked_org',message='Model blocked; secret gsk_fake_secret'))
+        error=HTTPError('https://api.groq.com',403,'forbidden',{},BytesIO(json.dumps(body).encode()))
+        with patch.dict(os.environ,{'GROQ_API_KEY':'gsk_fake_secret'},clear=True),patch('app.providers.urlopen',side_effect=error) as mock:
+            with self.assertRaises(RuntimeError) as caught:GroqPlanner()('snow',{}, {})
+            self.assertIn('model_permission_blocked_org',str(caught.exception))
+            self.assertNotIn('gsk_fake_secret',str(caught.exception))
+            self.assertEqual(mock.call_args.args[0].get_header('User-agent'),'hub-weather-agent/0.1')
+
+    def test_non_json_access_filter_is_not_called_model_permission(self):
+        error=HTTPError('https://api.groq.com',403,'forbidden',{},BytesIO(b'error code: 1010'))
+        with patch.dict(os.environ,{'GROQ_API_KEY':'test'},clear=True),patch('app.providers.urlopen',side_effect=error):
+            with self.assertRaisesRegex(RuntimeError,'Upstream access filter'):GroqPlanner()('snow',{}, {})
 
 if __name__=='__main__':unittest.main()
