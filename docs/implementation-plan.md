@@ -154,3 +154,7 @@ Keep the agent's original weather-analysis path working before expanding network
 Deterministic checks: numerical correctness, allocation constraints, reproducibility, provenance, missing-data behavior. Agent checks: correct tool/arguments, context resolution, unsupported-request handling, schema compliance, and evidence-supported answers. LLM evaluations use semantic assertions rather than exact prose matching. Live source failure must yield a visible partial/failed result, never an invented answer.
 
 The full AI session is mandatory. Preserve this chat and future work via a verified export before submission; a hand-written summary is not a substitute. Redact secrets if present and disclose redactions. This plan is one part of that record, not the full session.
+
+## Accepted provider plan — 2 November 2026
+
+Start with Groq / openai/gpt-oss-20b on its free tier. Keep provider/model configurable and preserve the OpenAI adapter. Both use one shared strict Intent contract and unchanged deterministic tools. Provider/model switching, per-model evaluation reports, quota/error handling and credential isolation are mandatory implementation considerations. See model-providers.md for commands and acceptance gates. Live credentials and evaluation remain pending; Gemini/Ollama are future adapters, not claimed support.

@@ -101,7 +101,7 @@ class AgentTests(unittest.TestCase):
             def __enter__(self):return self
             def __exit__(self,*args):pass
             def read(self):return json.dumps(dict(status='completed',output=[dict(type='function_call',name='plan_analysis',arguments=json.dumps(intent))])).encode()
-        with patch.dict('os.environ',{'OPENAI_API_KEY':'test-not-real','OPENAI_MODEL':'test-model'}),patch('app.agent.urlopen',return_value=Response()) as mock:
+        with patch.dict('os.environ',{'OPENAI_API_KEY':'test-not-real','OPENAI_MODEL':'test-model'}),patch('app.providers.urlopen',return_value=Response()) as mock:
             result=OpenAIPlanner()('snow',{}, {})
             body=json.loads(mock.call_args.args[0].data)
             self.assertTrue(body['tools'][0]['strict'])

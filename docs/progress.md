@@ -37,17 +37,17 @@ Updated: 2 November 2026. No actual hub locations have been selected.
 
 - [x] Local HTTP API and browser chat.
 - [x] Explicit coordinate registration; no invented facilities.
-- [x] Strict JSON-schema model function calls plus application validation.
+- [x] Strict model JSON-schema plans (Groq) / function calls (OpenAI), plus shared application validation.
 - [x] SQLite conversation context and follow-ups.
 - [x] Chat executes an explicitly supplied network replay.
 - [x] Pasted scenario JSON in demo chat receives guidance rather than repeating weather.
 - [x] Browser checks: registration, chat, follow-up, sorting, replay, affected-day filtering and mobile width.
-- [ ] Configure a real OpenAI API key/model locally and verify a live AI conversation.
+- [ ] Configure a real Groq API key locally and verify starter model openai/gpt-oss-20b.
 - [ ] Replace limited demo parsing with verified live AI for interview use.
 
 ## 5. Evaluation and handover
 
-- [x] 46 automated tests pass, including an intentionally invalid allocation detected by the audit.
+- [x] 50 automated tests pass, including an intentionally invalid allocation detected by the audit.
 - [x] Six conversation cases pass with the demo parser and explicit synthetic weather.
 - [x] README, architecture and assumptions documents.
 - [x] User manual checks: snow baseline, heat follow-up, heavy snow subset and unsupported flight data.
@@ -61,7 +61,7 @@ Updated: 2 November 2026. No actual hub locations have been selected.
 ## Next implementation order
 
 1. Manually verify the completed network comparison using docs/network-comparison-test.md.
-2. Verify live AI planning and follow-up behavior; complete real-model evaluation.
+2. Verify Groq planning and follow-ups; evaluate the starter model, then switch model through configuration and compare reports.
 3. Add population coverage if time permits without compromising the required agent flow.
 4. Finalize submission, export AI session and rehearse the demo.
 
@@ -82,3 +82,7 @@ This is a local single-user application. Weather history is evidence; capacity l
 ## Network comparison milestone
 
 POST /api/scenarios/compare accepts reference/candidate scenarios. Results include paired daily differences, unmet demand avoided, minimum-service improvement, installed capacity and matched-demand distance change. Browser copy, filtering, sorting and mobile-width checks pass. Negative benefits and shared-storm risk are tested. No real LLM is needed for the comparison form.
+
+## Provider/model switching
+
+Groq is now the default live provider; OpenAI remains supported. Set LLM_PROVIDER/LLM_MODEL or use scripts/start-live.ps1 for hidden-key entry. Per-model evaluations record provider/model and latency. See docs/model-providers.md. Gemini/Ollama require future adapters. Live starter/second-model verification remains pending.

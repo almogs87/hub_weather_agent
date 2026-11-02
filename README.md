@@ -14,7 +14,7 @@ python -m app.server --demo
 
 Open http://127.0.0.1:8000 . Demo mode uses a limited deterministic question parser, not an LLM; weather still comes from the real API or its cache. No synthetic weather is substituted in the application. Add candidate coordinates and an IANA timezone, then ask using that location's ID, e.g. 'Snow exposure for my-site in 2025', followed by 'What about heat?'. Demo parsing only recognizes simple location IDs, years and hazard words; it is for checking the interface.
 
-For AI mode, set OPENAI_API_KEY securely in your local environment and set OPENAI_MODEL to a model available to your account that supports strict function calling. Then run:
+For AI mode, Groq is the default provider (openai/gpt-oss-20b). Use scripts/start-live.ps1 to enter a Groq key with hidden input, or securely set GROQ_API_KEY and optionally LLM_PROVIDER/LLM_MODEL. For OpenAI set LLM_PROVIDER=openai, OPENAI_API_KEY and LLM_MODEL. Then run:
 
 ~~~powershell
 python -m app.server
@@ -22,7 +22,7 @@ python -m app.server
 
 The example .env file is not auto-loaded. Never commit API keys or paste them into a chat. An AI call is made only when live-mode chat is submitted. Real model integration is implemented but has not been tested with live credentials. Provider refusal, incomplete output or invalid schema cannot execute an analysis.
 
-The model selects an approved analysis through a strict JSON-schema function call. Python validates that call and computes every number. Explanations are deterministic templates grounded in returned metrics, preventing narrative arithmetic drift. Conversation context and registered locations persist in SQLite. Use New conversation to clear the active context.
+The model selects an approved analysis through a strict schema: Groq returns a structured plan; OpenAI returns a function call. Python validates that call and computes every number. Explanations are deterministic templates grounded in returned metrics, preventing narrative arithmetic drift. Conversation context and registered locations persist in SQLite. Use New conversation to clear the active context.
 
 ## Winter replay
 
@@ -63,7 +63,7 @@ python -m evals.run
 python -m evals.run --live-model
 ~~~
 
-46 tests pass; six conversation evaluation cases pass with the demo parser and explicit synthetic weather. --live-model calls the configured real LLM while retaining synthetic weather, isolating planning quality from network/data variation. It requires credentials and may incur provider charges. It has not yet been run live.
+50 tests pass; six conversation evaluation cases pass with the demo parser and explicit synthetic weather. --live-model calls the configured real LLM while retaining synthetic weather, isolating planning quality from network/data variation. It requires credentials and may incur provider charges. It has not yet been run live.
 
 Headless browser checks passed using isolated synthetic weather: registration, snowfall analysis, heat follow-up, table sorting, network replay, and a 390px mobile layout without page overflow. Live historical weather was independently verified by the user from PowerShell. No actual model call has been verified yet.
 
@@ -102,3 +102,5 @@ Track completed work and next steps in docs/progress.md. Replay now includes sum
 ## Compare networks
 
 Use the replay Scenario JSON as the reference, then supply Candidate network JSON in Compare networks. The API POST /api/scenarios/compare enforces equal demand, dates and distance limits; shared hubs retain weather location/component. Each unique weather location is fetched once and reused for both networks. Results show service benefits and costs in additional installed capacity/distance, without assuming that backups escape regional storms. Distance comparison matches the smaller served quantity per demand area/day so reduced service cannot masquerade as shorter transport. No monetary costs or automatic investment recommendation. See docs/network-comparison-test.md for a complete manual test.
+
+Provider and model configuration, hidden-key startup, switching examples and evaluation gates are documented in docs/model-providers.md. No real Groq request has yet been verified with credentials.
