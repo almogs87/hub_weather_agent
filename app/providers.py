@@ -89,6 +89,7 @@ class GroqPlanner:
         message=choices[0].get('message',{})
         if message.get('refusal') or not isinstance(message.get('content'),str):
             raise ValueError('Groq declined or returned no plan; no analysis executed')
+        self.last_metadata=dict(provider='groq',model=self.config.model,response_id=payload.get('id'),usage=payload.get('usage'))
         return Intent.model_validate_json(message['content'])
 
 class OpenAIPlanner:
@@ -104,6 +105,7 @@ class OpenAIPlanner:
         calls=[o for o in payload.get('output',[]) if o.get('type')=='function_call' and o.get('name')=='plan_analysis']
         if payload.get('status')!='completed' or len(calls)!=1:
             raise ValueError('OpenAI returned no completed plan; no analysis executed')
+        self.last_metadata=dict(provider='openai',model=self.config.model,response_id=payload.get('id'),usage=payload.get('usage'))
         return Intent.model_validate_json(calls[0]['arguments'])
 
 def build_planner(config=None):

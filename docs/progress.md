@@ -47,11 +47,11 @@ Updated: 2 November 2026. No actual hub locations have been selected.
 
 ## 5. Evaluation and handover
 
-- [x] 50 automated tests pass, including an intentionally invalid allocation detected by the audit.
-- [x] Six conversation cases pass with the demo parser and explicit synthetic weather.
+- [x] 59 automated tests pass, including an intentionally invalid allocation detected by the audit.
+- [x] Seven conversation cases pass with the demo parser and explicit synthetic weather.
 - [x] README, architecture and assumptions documents.
 - [x] User manual checks: snow baseline, heat follow-up, heavy snow subset and unsupported flight data.
-- [ ] Run the six conversation cases against the actual model: python -m evals.run --live-model.
+- [ ] Run the seven conversation cases against the actual model: python -m evals.run --live-model.
 - [ ] Repeat user replay test using the new summary/table (no JSON scrolling).
 - [ ] Export the complete AI-development conversation; mandatory deliverable.
 - [ ] Clean-start installation and final interview rehearsal.
@@ -86,3 +86,7 @@ POST /api/scenarios/compare accepts reference/candidate scenarios. Results inclu
 ## Provider/model switching
 
 Groq is now the default live provider; OpenAI remains supported. Set LLM_PROVIDER/LLM_MODEL or use scripts/start-live.ps1 for hidden-key entry. Per-model evaluations record provider/model and latency. See docs/model-providers.md. Gemini/Ollama require future adapters. Live starter/second-model verification remains pending.
+
+## Live test findings and fixes
+
+User verified Groq live mode can plan Denver snowfall and heat questions. Cross-location comparisons remain blocked by weather-provider connectivity/503 errors in the user test, not demonstrated model-location failures. Fixed a live model heavy-snow threshold mistake with a disclosed application metric policy; original and applied plans remain inspectable. Added response metadata/cache traces and bounded transient weather retries. Seven deterministic conversation cases pass; the seven-case live-model evaluation and successful uncached Chicago/Phoenix comparison remain pending.

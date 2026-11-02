@@ -38,8 +38,12 @@ def main():
                 response=service.chat(dict(message=case['message'],conversation_id=conversation))
                 conversation=response['conversation_id']
                 item['intent']=response['intent']
+                item['planning']=response.get('planning')
+                raw_plan=response.get('planning',{}).get('model_plan',{})
+                item['raw_model_plan_matches_expected']=all(raw_plan.get(k)==case[k] for k in ('action','hazard','threshold') if k in case)
                 assert response['intent']['action']==case['action'],'Wrong action'
                 if 'hazard' in case:assert response['intent']['hazard']==case['hazard'],'Wrong hazard'
+                if 'threshold' in case:assert response['intent']['threshold']==case['threshold'],'Wrong threshold'
                 if response['cards']:
                     assert all(c['evidence']['source_id']=='fixture:evaluation' for c in response['cards']),'Missing evidence'
                     if case.get('hazard')=='heat':

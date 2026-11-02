@@ -137,4 +137,14 @@ class AgentTests(unittest.TestCase):
         enrich_report(result,[Hub('A',100)],[Demand('X',60)],{'A':rows},WinterProfile())
         self.assertFalse(result['validation']['passed'])
 
+    def test_original_model_plan_and_applied_policy_are_visible(self):
+        def wrong_plan(*args):
+            return Intent(action='weather',location_ids=['siteA'],hazard='snow',start=date(2025,1,1),end=date(2025,12,31),threshold=0,question=None)
+        self.service.planner=wrong_plan
+        result=self.service.chat(dict(message='Heavy snow for siteA in 2025'))
+        self.assertEqual(result['planning']['model_plan']['threshold'],0)
+        self.assertEqual(result['planning']['applied_plan']['threshold'],15)
+        self.assertTrue(result['planning']['policy_adjustments'])
+        self.assertEqual(result['cards'][0]['threshold'],15)
+
 if __name__=='__main__':unittest.main()

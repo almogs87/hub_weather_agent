@@ -25,5 +25,11 @@
   {
     "message": "Run a winter replay",
     "action": "winter_replay"
+  },
+  {
+    "message": "Heavy snow for siteA in 2025",
+    "action": "weather",
+    "hazard": "snow",
+    "threshold": 15
   }
 ]

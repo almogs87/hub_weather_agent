@@ -6,6 +6,7 @@ import json
 import math
 from pathlib import Path
 import random
+import time
 from statistics import median
 from urllib.parse import urlencode, parse_qs
 from urllib.error import HTTPError, URLError
@@ -73,8 +74,18 @@ class WeatherClient:
 
     @staticmethod
     def download(url):
-        with urlopen(url,timeout=45) as response:
-            return response.read()
+        for attempt in range(3):
+            try:
+                with urlopen(url,timeout=20) as response:
+                    return response.read()
+            except HTTPError as exc:
+                if exc.code not in (502,503,504) or attempt==2:raise
+            except (URLError,TimeoutError,OSError) as exc:
+                reason=getattr(exc,'reason',exc)
+                # Do not retry access-denied conditions or certificate failures.
+                denied=getattr(reason,'winerror',None)==10013 or getattr(reason,'errno',None) in (13,10013)
+                if denied or 'CERTIFICATE_VERIFY_FAILED' in str(reason) or attempt==2:raise
+            time.sleep(.5*(attempt+1))
 
     def covering_cache(self,request,url):
         """Reuse verified observations when only the date window shrinks."""
