@@ -31,6 +31,22 @@ class AgentTests(unittest.TestCase):
     def test_schema_rejects_unknown_fields(self):
         with self.assertRaises(ValueError):Intent.model_validate(dict(action='weather',location_ids=[],hazard='snow',start=None,end=None,threshold=None,question=None,execute_code='oops'))
 
+    def test_snow_periods_and_demo_limitations(self):
+        result=self.service.chat(dict(message='Heavy snow for siteA in 2025'))
+        self.assertIn('1 observed period',result['answer'])
+        self.assertIn('> 15',result['answer'])
+        depth=self.service.chat(dict(message='Snow depth for siteA in 2025'))
+        self.assertIn('not available',depth['answer'])
+        custom=self.service.chat(dict(message='Snow over 20 cm for siteA in 2025'))
+        self.assertEqual(custom['intent']['action'],'clarify')
+
+    def test_ordinary_snow_resets_heavy_threshold_but_location_followup_inherits(self):
+        heavy=self.service.chat(dict(message='Heavy snow for siteA in 2025'))
+        follow=self.service.chat(dict(message='What about siteB?',conversation_id=heavy['conversation_id']))
+        self.assertEqual(follow['cards'][0]['threshold'],15)
+        ordinary=self.service.chat(dict(message='All snow events for siteB in 2025',conversation_id=heavy['conversation_id']))
+        self.assertEqual(ordinary['cards'][0]['threshold'],0)
+
     def test_followup_and_persistent_state(self):
         first=self.service.chat(dict(message='Snow for siteA in 2025'))
         second=self.service.chat(dict(message='What about heat?',conversation_id=first['conversation_id']))
@@ -52,7 +68,7 @@ class AgentTests(unittest.TestCase):
         self.assertIn('deterministic',follow['answer'])
 
     def test_unsupported_is_explicit(self):
-        r=self.service.chat(dict(message='Flood risk for siteA'))
+        r=self.service.chat(dict(message='Flight cancellations for siteA'))
         self.assertEqual(r['intent']['action'],'unsupported')
         self.assertEqual(r['cards'],[])
 

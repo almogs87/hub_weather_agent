@@ -13,9 +13,9 @@ class Location(StrictModel):
     timezone: str=Field(min_length=1,max_length=80)
 
 class Intent(StrictModel):
-    action: Literal['weather','compare','winter_replay','explain','clarify','unsupported']
+    action: Literal['weather','compare','risk','winter_replay','explain','clarify','unsupported']
     location_ids: list[str]
-    hazard: Literal['snow','heavy_precipitation','heat','cold','wind'] | None
+    hazard: Literal['snow','heavy_precipitation','heat','cold','wind','winter','hurricane','flood','hurricane_flood','overall'] | None
     start: date | None
     end: date | None
     threshold: float | None

@@ -1,6 +1,6 @@
 # Weather Risk Intelligence Agent
 
-A local conversational analyst for historical weather exposure and explicit winter network scenarios. No actual hub sites are selected automatically.
+A local conversational analyst for historical weather exposure and county-level natural hazard screening. Seven city-based hubs are illustrative examples, not actual company facilities.
 
 ## Run
 
@@ -12,7 +12,7 @@ python -m pip install -r requirements.txt
 python -m app.server --demo
 ~~~
 
-Open http://127.0.0.1:8000 . Demo mode uses a limited deterministic question parser, not an LLM; weather still comes from the real API or its cache. No synthetic weather is substituted in the application. Add candidate coordinates and an IANA timezone, then ask using that location's ID, e.g. 'Snow exposure for my-site in 2025', followed by 'What about heat?'. Demo parsing only recognizes simple location IDs, years and hazard words; it is for checking the interface.
+Open http://127.0.0.1:8000 . Demo mode uses a limited deterministic question parser, not an LLM; weather still comes from the real API or its cache. No synthetic weather is substituted in the application. The app seeds illustrative hubs automatically; optionally add candidate coordinates and an IANA timezone, then ask using that location's ID, e.g. 'Snow exposure for my-site in 2025', followed by 'What about heat?'. Demo parsing only recognizes simple location IDs, years and hazard words; it is for checking the interface.
 
 For AI mode, Groq is the default provider (openai/gpt-oss-20b). Use scripts/start-live.ps1 to enter a Groq key with hidden input, or securely set GROQ_API_KEY and optionally LLM_PROVIDER/LLM_MODEL. For OpenAI set LLM_PROVIDER=openai, OPENAI_API_KEY and LLM_MODEL. Then run:
 
@@ -57,15 +57,17 @@ Trends use a Theil-Sen slope with an approximate circular residual block bootstr
 
 ## Tests and evaluations
 
+See [example questions](docs/example-questions.md) for supported questions, follow-ups, and demo limitations.
+
 ~~~powershell
 python -m unittest discover -s tests -v
 python -m evals.run
 python -m evals.run --live-model
 ~~~
 
-70 tests pass; seven conversation evaluation cases pass with the demo parser and explicit synthetic weather. --live-model calls the configured real LLM while retaining synthetic weather, isolating planning quality from network/data variation. It requires credentials and may incur provider charges. It has not yet been run live.
+77 tests pass; 14 conversation evaluation cases pass with the demo parser and explicit synthetic weather and FEMA data. --live-model calls the configured real LLM while retaining synthetic data, isolating planning quality from network/data variation. It requires credentials and may incur provider charges. The earlier seven-case live evaluation passed; the expanded 14-case evaluation remains pending.
 
-Headless browser checks passed using isolated synthetic weather: registration, snowfall analysis, heat follow-up, table sorting, network replay, and a 390px mobile layout without page overflow. Live historical weather was independently verified by the user from PowerShell. No actual model call has been verified yet.
+Headless browser checks passed using isolated synthetic weather: registration, snowfall analysis, heat follow-up, table sorting, network replay, and a 390px mobile layout without page overflow. Live historical weather was independently verified by the user from PowerShell. The earlier seven-case live model evaluation passed; the current interface and expanded schema still need an end-to-end live browser check.
 
 ## API
 
@@ -91,7 +93,7 @@ Runtime SQLite and weather caches live under data/ and are ignored by Git. Cache
 
 ## Remaining scope
 
-Population-based national coverage, automatic facility optimization, dedicated flood/hurricane evidence, actual transport-closure data, shipment backlog, voice, alerts and deployment are not implemented. Coordinates can be registered throughout the US, but that does not demonstrate nationwide coverage. Mainland, Alaska and Hawaii are separate service components in scenario inputs; the system does not infer a component from coordinates.
+Population-based national coverage, automatic facility optimization, facility-level flood/hurricane evidence, actual transport-closure data, shipment backlog, voice, alerts and deployment are not implemented. Coordinates can be registered throughout the US, but that does not demonstrate nationwide coverage. Mainland, Alaska and Hawaii are separate service components in scenario inputs; the system does not infer a component from coordinates.
 
 The mandatory full AI-development-session export remains outstanding; a design summary is not a substitute. See docs/architecture.md and docs/assumptions.md.
 
@@ -111,6 +113,10 @@ For weather connectivity diagnostics run python -m app.weather_probe from the pr
 
 ## Independent weather fallback
 
-NOAA NCEI GHCN-Daily station observations now back up Open-Meteo. Default WEATHER_SOURCE=auto retries the complete analysis with NOAA when a primary service/connection request fails; it never silently ranks mixed ERA5 and station results. Sources are shown in answers and evidence. NOAA covers snowfall, precipitation, maximum/minimum temperature; maximum wind is explicitly unsupported. The live launcher supports -WeatherSource noaa, and weather_cli supports --source noaa. See docs/weather-sources.md for source definitions, caveats and a direct verification command. Live NOAA retrieval still needs user-terminal verification.
+NOAA NCEI GHCN-Daily station observations now back up Open-Meteo. Default WEATHER_SOURCE=auto retries the complete analysis with NOAA when a primary service/connection request fails; it never silently ranks mixed ERA5 and station results. Sources are shown in answers and evidence. NOAA covers snowfall, precipitation, maximum/minimum temperature; maximum wind is explicitly unsupported. The live launcher supports -WeatherSource noaa, and weather_cli supports --source noaa. See docs/weather-sources.md for source definitions, caveats and a direct verification command. NOAA retrieval was verified for Denver and Chicago.
 
 NOAA station selection uses the official element/year inventory before checking up to sixteen nearest eligible stations. This excludes inactive historical stations before they consume the daily-data search budget. Daily quality/95% coverage checks remain mandatory.
+
+## County hazard screening
+
+The app seeds illustrative Chicago, Detroit, Minneapolis, Miami, Houston, Denver and Dallas hubs on server startup without overwriting existing user locations. FEMA National Risk Index county-level expected annual loss scores provide screening context for winter weather, hurricanes, inland flooding and coastal flooding. Scores are relative county measures, not facility downtime or an event probability. Data is fetched from the public FEMA county feature service and cached with its dataset version, timestamp and response hash. Missing scores remain unavailable; Dallas County lacks a coastal-flood score in the retrieved December 2025 data, so its overall screening is explicitly partial. Actual facilities and their vulnerabilities require separate evidence.

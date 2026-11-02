@@ -20,6 +20,11 @@ class PlanningPolicyTests(unittest.TestCase):
         result,changes=apply_metric_policy('Heavy snow above 20 cm',intent(threshold=20))
         self.assertEqual(result.threshold,20)
         self.assertEqual(changes,[])
+    def test_explicit_ordinary_snow_resets_inherited_heavy_threshold(self):
+        result,changes=apply_metric_policy('All snow events for Denver in 2025',intent(threshold=15))
+        self.assertIsNone(result.threshold)
+        self.assertTrue(changes)
+        self.assertEqual(apply_metric_policy('What about Denver?',intent(threshold=15))[0].threshold,15)
     def test_other_hazards_and_clarification_unchanged(self):
         self.assertEqual(apply_metric_policy('What about heat?',intent(hazard='heat',threshold=None))[0].hazard,'heat')
         self.assertEqual(apply_metric_policy('Heavy snow where?',intent(action='clarify'))[0].action,'clarify')

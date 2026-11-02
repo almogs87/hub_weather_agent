@@ -97,9 +97,33 @@ User verified Groq live mode can plan Denver snowfall and heat questions. Cross-
 - [x] Source-consistent whole-analysis fallback, raw-file cache and station provenance.
 - [x] Explicit unsupported maximum-wind fallback; no snow-depth substitution.
 - [x] Launcher/CLI source selection and source shown in results.
-- [ ] Verify live NOAA retrieval from the normal user terminal; sandbox access failed.
-- [ ] Repeat Denver/Chicago comparison with NOAA and inspect station coverage.
+- [x] Verify live NOAA retrieval outside the network sandbox; Denver station download succeeded on 2 November 2026.
+- [x] Repeat Denver/Chicago comparison with NOAA and inspect station coverage (2025 snow, 2 November 2026).
 
 See docs/weather-sources.md. Station daily observation windows differ from ERA5 local civil days; no silent mixing is permitted.
 
 NOAA follow-up: network downloads verified by user; all first eight cached stations had zero 2025 snow observations. Added inventory-based element/year filtering and expanded eligible candidate cap to sixteen; 70 tests pass. Retry the Chicago command to verify an accepted active station.
+
+## Desktop continuation verification ? 2 November 2026
+
+70 unit tests and seven demo conversation evaluations pass. The actual Service.chat comparison path completed with NOAA for both cities: Chicago station US1ILCK0074, 362/365 valid days, 32 days with snowfall >0 cm (8.84%); Denver station USC00052223, 365/365 valid days, 21 snowfall days (5.75%). Chicago used existing cached observations; Denver downloaded a station file outside the network sandbox, then the comparison reused that cache. No live LLM was involved. The local response/provenance report is saved at eval-results/noaa-comparison-2025.json (ignored by Git). No Groq/OpenAI key is configured in the current process; live-model evaluation remains pending credential setup.
+
+## Live Groq evaluation verified ? 2 November 2026
+
+Groq openai/gpt-oss-20b passed all seven conversation cases against synthetic weather after clarifying that winter_replay should be selected even without a supplied network (the application requests missing inputs). Initial run: 6/7; immediate rerun encountered HTTP 429 token limits. Final paced run: 7/7, report eval-results/groq-live-paced-2026-11-02.json (ignored). All 70 unit tests and seven demo evaluations also pass. The runner now accepts --delay-seconds and the hidden-key launcher uses ten seconds between evaluation cases. This verifies live planning separately from real-weather retrieval; a browser end-to-end live sequence and second-model comparison remain pending. Credentials were not written to project files.
+
+## Assignment-focused continuation in progress
+
+Added illustrative hub catalog and FEMA county adapter, seeded on server startup without overwriting existing locations. The risk chat route supports winter, hurricane and flooding comparisons using FEMA expected annual loss scores; missing scores are explicitly partial. FEMA December 2025 data downloaded for all seven example counties. Demo-mode Chicago/Midwest and Miami/Houston examples return results; Dallas is partial because coastal flood is unavailable. Live Groq and browser checks, robust follow-ups, updated evaluations and documentation remain to be completed.
+
+## Current checkpoint
+
+FEMA data for seven example counties has been fetched from the live public service and cached. The chat UI now places example prompts first and displays county hazard scores in a table, with advanced network forms collapsed. Two work streams are underway: model planning/follow-up evaluation and UI/integration verification. The Dallas screening remains partial because FEMA reports no coastal-flood score for Dallas County; this is not replaced with zero. Next: complete follow-up/evaluation changes, verify the browser and update the README. Last user-reported weekly allowance: 78%; the agent cannot read the current balance directly.
+
+## Parallel review results
+
+FEMA follow-up handling and evaluation coverage were extended. All 76 unit tests and 14 demo evaluation cases pass, including the four assignment examples and hazard follow-ups using synthetic evaluation data. The chat displays county scores and source details; advanced network controls are collapsed. Live FEMA data was verified for the seven example counties. Live Groq evaluation with the expanded schema remains pending; a browser check could not run because the browser access host was unavailable. The last known weekly allowance is 78%, pending the user dashboard update.
+
+## HTTP integration checkpoint
+
+The four assignment questions were exercised through the local demo HTTP API with real cached sources. A pre-existing Chicago record originally prevented example region metadata from being seeded; exact location matches now gain missing metadata, and conflicting user locations are preserved with a separately named example. Midwest results now include Chicago, Detroit and Minneapolis. The other examples returned expected results, with Dallas explicitly partial. All 77 unit tests and 14 demo evaluations pass. Browser access host remains unavailable; expanded live Groq evaluation requires a configured key.

@@ -20,7 +20,7 @@
   },
   {
     "message": "Hurricane and flood risk for siteA",
-    "action": "unsupported"
+    "action": "risk"
   },
   {
     "message": "Run a winter replay",
@@ -31,5 +31,71 @@
     "action": "weather",
     "hazard": "snow",
     "threshold": 15
+  },
+  {
+    "message": "Which hubs in the Midwest are most exposed to winter disruption?",
+    "action": "risk",
+    "hazard": "winter",
+    "locations": [
+      "chicago",
+      "detroit",
+      "minneapolis"
+    ],
+    "risk_count": 3,
+    "new_conversation": true
+  },
+  {
+    "message": "Compare Miami and Houston in terms of hurricane and flood exposure.",
+    "action": "risk",
+    "hazard": "hurricane_flood",
+    "locations": [
+      "miami",
+      "houston"
+    ],
+    "risk_count": 2,
+    "new_conversation": true
+  },
+  {
+    "message": "Compare only flooding",
+    "action": "risk",
+    "hazard": "flood",
+    "locations": [
+      "miami",
+      "houston"
+    ],
+    "risk_count": 2
+  },
+  {
+    "message": "Why?",
+    "action": "explain",
+    "risk_count": 2
+  },
+  {
+    "message": "What about Dallas?",
+    "action": "risk",
+    "hazard": "flood",
+    "locations": [
+      "dallas"
+    ],
+    "risk_count": 1
+  },
+  {
+    "message": "What percentage of days in Denver last year had snowfall?",
+    "action": "weather",
+    "hazard": "snow",
+    "locations": [
+      "denver"
+    ],
+    "new_conversation": true
+  },
+  {
+    "message": "Why is the Dallas hub's weather disruption risk high?",
+    "action": "risk",
+    "hazard": "overall",
+    "locations": [
+      "dallas"
+    ],
+    "risk_count": 1,
+    "new_conversation": true
   }
 ]

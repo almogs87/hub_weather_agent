@@ -33,7 +33,7 @@ Stop the server before using the launcher to evaluate:
 .\scripts\start-live.ps1 -Model 'openai/gpt-oss-120b'
 ~~~
 
-Evaluation reuses the same six conversation cases and synthetic weather across models, records provider/model, pass/fail, planned intents and latency, and writes ignored eval-results/*.json files. Compare these reports rather than changing prompts and model simultaneously. Rate limits may cause failures; quota failure is not evidence of poor planning quality. Free plans are not unlimited.
+Evaluation reuses the same 14 conversation cases and synthetic weather across models, records provider/model, pass/fail, planned intents and latency, and writes ignored eval-results/*.json files. Compare these reports rather than changing prompts and model simultaneously. Rate limits may cause failures; quota failure is not evidence of poor planning quality. Free plans are not unlimited.
 
 For OpenAI, use -Provider openai -Model YOUR_AVAILABLE_MODEL (prompts for OPENAI_API_KEY). Gemini/Ollama/custom endpoints are planned adapters, not currently supported by a configuration-only change.
 
@@ -51,8 +51,8 @@ Current checks: mocked adapter success, malformed/truncated output, missing keys
 - [x] Provider/model visible in health and chat responses.
 - [x] Hidden-key local launcher; no secrets in reports.
 - [x] Repeatable model-specific evaluation reports.
-- [ ] Verify starter Groq model live and fix any actual schema compatibility issues.
-- [ ] Run six live conversation cases and a browser follow-up sequence.
+- [x] Verify starter Groq model live: seven conversation cases passed on 2 November 2026.
+- [ ] Run the expanded 14 live conversation cases and a browser follow-up sequence.
 - [ ] Repeat with the second model and record quality/latency/quota tradeoffs.
 - [ ] Add another provider only when needed, with adapter tests and the same live acceptance gates.
 
@@ -61,3 +61,7 @@ Official references checked 2 November 2026:
 - https://console.groq.com/docs/openai
 - https://console.groq.com/docs/rate-limits
 - https://developers.openai.com/api/docs/guides/structured-outputs
+
+The evaluation runner supports --delay-seconds 10 to pace requests for token-per-minute limits; the hidden-key launcher uses this pacing by default. Waiting time is excluded from each case latency.
+
+Live starter verification: openai/gpt-oss-20b passed 7/7 cases on 2 November 2026 with ten-second pacing and synthetic weather. A replay routing prompt clarification resolved the initial action mismatch. Report: eval-results/groq-live-paced-2026-11-02.json. Browser verification and second-model evaluation remain pending.

@@ -41,7 +41,7 @@ Default startup uses auto fallback, without that extra argument.
 
 ## Verification status
 
-70 automated tests pass, including NOAA units, quality filtering, snow-versus-depth separation, cache provenance, candidate rejection and whole-analysis source consistency. The user verified live NOAA downloads, but the initial eight-candidate search selected inactive stations with no 2025 snowfall data. Inventory-based eligibility now excludes them before the sixteen-candidate limit. A successful accepted Chicago result remains to be verified. Run the command above in the normal user terminal before relying on the fallback in the interview. Both providers can be unavailable; the app never manufactures observations.
+70 automated tests pass, including NOAA units, quality filtering, snow-versus-depth separation, cache provenance, candidate rejection and whole-analysis source consistency. The user verified live NOAA downloads, but the initial eight-candidate search selected inactive stations with no 2025 snowfall data. Inventory-based eligibility now excludes them before the sixteen-candidate limit. An accepted Chicago result and a complete Denver/Chicago comparison have now been verified; see the verification section below. Both providers can be unavailable; the app never manufactures observations.
 
 ## Official documentation
 
@@ -52,3 +52,7 @@ Default startup uses auto fallback, without that extra argument.
 NOAA dataset DOI: https://doi.org/10.7289/V5D21VHZ
 
 The NOAA inventory is a separate one-time cached download. Its first/last years are only a candidate filter, not proof of complete daily coverage. Actual records still must meet 95%. Missing values remain null; no incomplete station is made acceptable by this fix.
+
+## Accepted comparison verification ? 2 November 2026
+
+The 2025 snow comparison now completes through Service.chat using NOAA for both locations. Denver (39.7392, -104.9903) selected DENVER WATER DEPT, USC00052223, 1.91 km away: 365 valid days and 21 snowfall days (5.75%). Chicago (41.8781, -87.6298) selected OAK PARK 1.3 NNE, US1ILCK0074, 12.97 km away: 362 valid days and 32 snowfall days (8.84%). Chicago used its cached station file; Denver downloaded successfully outside the network sandbox. This verifies retrieval/coverage and deterministic comparison, not live model planning or nationwide availability. Local provenance report: eval-results/noaa-comparison-2025.json.

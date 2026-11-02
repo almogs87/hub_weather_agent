@@ -82,6 +82,8 @@ def main():
     p.add_argument('--demo',action='store_true')
     args=p.parse_args()
     service=Service(mode='demo' if args.demo else 'live')
+    from .hubs import seed_examples
+    seed_examples(service.store)
     server=ThreadingHTTPServer(('127.0.0.1',args.port),make_handler(service,args.port))
     print(f'Open http://127.0.0.1:{args.port} | mode: {service.mode}',flush=True)
     try:server.serve_forever()

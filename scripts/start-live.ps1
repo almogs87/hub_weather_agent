@@ -26,7 +26,7 @@ try {
     $env:WEATHER_SOURCE = $WeatherSource
     Write-Host "Provider: $Provider | Model: $Model | Weather: $WeatherSource"
     if ($Action -eq 'evaluate') {
-        & python -m evals.run --live-model --report "eval-results/$Provider-$($Model.Replace('/','-')).json"
+        & python -m evals.run --live-model --delay-seconds 10 --report "eval-results/$Provider-$($Model.Replace('/','-')).json"
     } else {
         & python -m app.server
     }
