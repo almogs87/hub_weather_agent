@@ -56,3 +56,26 @@ class ScenarioInput(StrictModel):
         if self.end<self.start or (self.end-self.start).days>365:
             raise ValueError('Replay must span between 1 and 366 days')
         return self
+
+class ComparisonInput(StrictModel):
+    reference_name: str=Field(default='Reference network',min_length=1,max_length=80)
+    candidate_name: str=Field(default='Candidate network',min_length=1,max_length=80)
+    reference: ScenarioInput
+    candidate: ScenarioInput
+
+    @model_validator(mode='after')
+    def comparable(self):
+        a,b=self.reference,self.candidate
+        if (a.start,a.end,a.max_distance_km)!=(b.start,b.end,b.max_distance_km):
+            raise ValueError('Both networks require identical dates and service-distance limits')
+        if sorted((d.id,d.units,d.component) for d in a.demands)!=sorted((d.id,d.units,d.component) for d in b.demands):
+            raise ValueError('Both networks must serve identical demand areas and quantities')
+        common=set(a.hub_locations)&set(b.hub_locations)
+        for identifier in common:
+            if a.hub_locations[identifier]!=b.hub_locations[identifier]:
+                raise ValueError('A shared hub must retain the same weather location')
+        ac={h.id:h.component for h in a.hubs}
+        bc={h.id:h.component for h in b.hubs}
+        if any(ac.get(i)!=bc.get(i) for i in common):
+            raise ValueError('A shared hub must retain its service component')
+        return self

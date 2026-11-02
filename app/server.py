@@ -12,6 +12,9 @@ from .winter import WinterProfile
 STATIC=Path(__file__).parent/'static'
 
 def dispatch(service,path,payload):
+    if path=='/api/scenarios/compare':
+        from .comparison import compare_networks
+        return compare_networks(service,payload)
     if path=='/api/chat':return service.chat(payload)
     if path=='/api/locations':return service.add_location(payload)
     if path=='/api/scenarios/replay':return service.replay(payload)

@@ -8,7 +8,7 @@ Updated: 2 November 2026. No actual hub locations have been selected.
 - [x] Deterministic demand allocation subject to capacity and distance constraints.
 - [x] Backup routing, simultaneous outages, partial capacity and recovery.
 - [x] Separate pre-existing shortfall from disruption-attributable shortfall.
-- [ ] Side-by-side comparison of explicitly supplied networks with/without backup.
+- [x] Side-by-side comparison of explicitly supplied networks with/without backup; identical demand/dates/profile and shared weather snapshot.
 
 ## 2. Historical data
 
@@ -47,7 +47,7 @@ Updated: 2 November 2026. No actual hub locations have been selected.
 
 ## 5. Evaluation and handover
 
-- [x] 40 automated tests pass, including an intentionally invalid allocation detected by the audit.
+- [x] 46 automated tests pass, including an intentionally invalid allocation detected by the audit.
 - [x] Six conversation cases pass with the demo parser and explicit synthetic weather.
 - [x] README, architecture and assumptions documents.
 - [x] User manual checks: snow baseline, heat follow-up, heavy snow subset and unsupported flight data.
@@ -60,7 +60,7 @@ Updated: 2 November 2026. No actual hub locations have been selected.
 
 ## Next implementation order
 
-1. Compare supplied networks with/without backup against identical historical weather, showing changes in unmet demand. No automatic hub selection.
+1. Manually verify the completed network comparison using docs/network-comparison-test.md.
 2. Verify live AI planning and follow-up behavior; complete real-model evaluation.
 3. Add population coverage if time permits without compromising the required agent flow.
 4. Finalize submission, export AI session and rehearse the demo.
@@ -78,3 +78,7 @@ Refresh the browser and rerun the scenario. The default view lists only days wit
 ## Current boundaries
 
 This is a local single-user application. Weather history is evidence; capacity loss/recovery are illustrative assumptions. It does not establish road closures, flight cancellations, future hazard probabilities, financial losses or national population coverage. Demand does not carry forward as backlog. The live LLM path is implemented but not yet verified with real credentials.
+
+## Network comparison milestone
+
+POST /api/scenarios/compare accepts reference/candidate scenarios. Results include paired daily differences, unmet demand avoided, minimum-service improvement, installed capacity and matched-demand distance change. Browser copy, filtering, sorting and mobile-width checks pass. Negative benefits and shared-storm risk are tested. No real LLM is needed for the comparison form.

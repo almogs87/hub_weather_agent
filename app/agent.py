@@ -91,7 +91,7 @@ class Service:
         result.update(location_id=location_id,evidence=data['evidence'],trend=trend(result['annual'],start.year,end.year))
         return result
 
-    def replay(self,payload):
+    def replay(self,payload,weather_snapshot=None):
         scenario=ScenarioInput.model_validate(payload)
         hubs=[Hub(**h.model_dump()) for h in scenario.hubs]
         demands=[Demand(**d.model_dump()) for d in scenario.demands]
@@ -108,7 +108,8 @@ class Service:
             identifier=scenario.hub_locations[hub.id]
             if identifier not in locations:raise ValueError('Unknown weather location: '+identifier)
             loc=locations[identifier]
-            dataset=self.weather.fetch(WeatherRequest(loc['latitude'],loc['longitude'],scenario.start,scenario.end,loc['timezone']))
+            dataset=(weather_snapshot[identifier] if weather_snapshot is not None else
+                     self.weather.fetch(WeatherRequest(loc['latitude'],loc['longitude'],scenario.start,scenario.end,loc['timezone'])))
             expected=(scenario.end-scenario.start).days+1
             if len(dataset['rows'])!=expected:raise ValueError('Replay requires every date')
             weather_rows[hub.id]=dataset['rows']

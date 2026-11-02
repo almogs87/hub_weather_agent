@@ -63,7 +63,7 @@ python -m evals.run
 python -m evals.run --live-model
 ~~~
 
-40 tests pass; six conversation evaluation cases pass with the demo parser and explicit synthetic weather. --live-model calls the configured real LLM while retaining synthetic weather, isolating planning quality from network/data variation. It requires credentials and may incur provider charges. It has not yet been run live.
+46 tests pass; six conversation evaluation cases pass with the demo parser and explicit synthetic weather. --live-model calls the configured real LLM while retaining synthetic weather, isolating planning quality from network/data variation. It requires credentials and may incur provider charges. It has not yet been run live.
 
 Headless browser checks passed using isolated synthetic weather: registration, snowfall analysis, heat follow-up, table sorting, network replay, and a 390px mobile layout without page overflow. Live historical weather was independently verified by the user from PowerShell. No actual model call has been verified yet.
 
@@ -98,3 +98,7 @@ The mandatory full AI-development-session export remains outstanding; a design s
 A shorter weather query can reuse a verified larger cached period when coordinates, timezone, model, units and variables match exactly. Evidence retains the original source URL/hash and records the requested analysis URL plus subset_from_cache. --refresh bypasses this reuse. Weather connection failures are labeled specifically.
 
 Track completed work and next steps in docs/progress.md. Replay now includes summaries, sortable affected-day rows, recovery triggers and automatic accounting checks. Raw evidence remains collapsed.
+
+## Compare networks
+
+Use the replay Scenario JSON as the reference, then supply Candidate network JSON in Compare networks. The API POST /api/scenarios/compare enforces equal demand, dates and distance limits; shared hubs retain weather location/component. Each unique weather location is fetched once and reused for both networks. Results show service benefits and costs in additional installed capacity/distance, without assuming that backups escape regional storms. Distance comparison matches the smaller served quantity per demand area/day so reduced service cannot masquerade as shorter transport. No monetary costs or automatic investment recommendation. See docs/network-comparison-test.md for a complete manual test.
