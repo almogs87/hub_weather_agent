@@ -1,6 +1,7 @@
 param(
     [ValidateSet('groq','openai')][string]$Provider = 'groq',
     [string]$Model = '',
+    [ValidateSet('auto','open-meteo','noaa')][string]$WeatherSource = 'auto',
     [ValidateSet('serve','evaluate')][string]$Action = 'serve'
 )
 $ErrorActionPreference = 'Stop'
@@ -12,6 +13,7 @@ $keyVariable = if ($Provider -eq 'groq') { 'GROQ_API_KEY' } else { 'OPENAI_API_K
 $previousKey = [Environment]::GetEnvironmentVariable($keyVariable, 'Process')
 $previousProvider = $env:LLM_PROVIDER
 $previousModel = $env:LLM_MODEL
+$previousWeatherSource = $env:WEATHER_SOURCE
 Push-Location (Split-Path -Parent $PSScriptRoot)
 try {
     if (-not $previousKey) {
@@ -21,7 +23,8 @@ try {
     }
     $env:LLM_PROVIDER = $Provider
     $env:LLM_MODEL = $Model
-    Write-Host "Provider: $Provider | Model: $Model"
+    $env:WEATHER_SOURCE = $WeatherSource
+    Write-Host "Provider: $Provider | Model: $Model | Weather: $WeatherSource"
     if ($Action -eq 'evaluate') {
         & python -m evals.run --live-model --report "eval-results/$Provider-$($Model.Replace('/','-')).json"
     } else {
@@ -32,6 +35,7 @@ try {
     [Environment]::SetEnvironmentVariable($keyVariable, $previousKey, 'Process')
     $env:LLM_PROVIDER = $previousProvider
     $env:LLM_MODEL = $previousModel
+    $env:WEATHER_SOURCE = $previousWeatherSource
     if ($secureKey) { $secureKey.Dispose() }
     $credential = $null
     Pop-Location

@@ -3,7 +3,8 @@ import argparse
 from datetime import date
 import json
 import sys
-from .weather import WeatherClient, WeatherRequest, HAZARDS, exposure, trend
+from .weather import WeatherRequest, HAZARDS, exposure, trend
+from .weather_sources import WeatherSources
 
 def main():
     p=argparse.ArgumentParser(description=__doc__)
@@ -15,10 +16,11 @@ def main():
     p.add_argument('--hazard',choices=HAZARDS,default='snow')
     p.add_argument('--threshold',type=float)
     p.add_argument('--refresh',action='store_true')
+    p.add_argument('--source',choices=['auto','open-meteo','noaa'],default=None)
     args=p.parse_args()
     try:
         request=WeatherRequest(args.latitude,args.longitude,args.start,args.end,args.timezone)
-        data=WeatherClient().fetch(request,args.refresh)
+        data=WeatherSources(source=args.source).fetch(request,args.refresh,hazard=args.hazard)
         result=exposure(data['rows'],args.start,args.end,args.hazard,args.threshold)
         result['trend']=trend(result['annual'],args.start.year,args.end.year)
         result['evidence']=data['evidence']

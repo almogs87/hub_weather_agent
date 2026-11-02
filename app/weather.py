@@ -237,6 +237,8 @@ def rank_exposure(results):
     keys=('hazard','operator','threshold','unit','start','end')
     if len({tuple(r[k] for k in keys) for r in results})>1:
         raise ValueError('Cannot rank different definitions or periods')
+    signatures={(r.get('evidence',{}).get('dataset_family') or r.get('evidence',{}).get('source'),r.get('evidence',{}).get('model'),r.get('evidence',{}).get('day_basis','local civil day')) for r in results}
+    if len(signatures)>1:raise ValueError('Cannot rank mixed weather datasets or day definitions')
     ids=[r['location_id'] for r in results]
     if len(ids)!=len(set(ids)):
         raise ValueError('Duplicate location ID')

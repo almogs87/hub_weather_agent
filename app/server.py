@@ -37,7 +37,7 @@ def make_handler(service,port):
             self.wfile.write(raw)
         def do_GET(self):
             if self.path=='/api/health':
-                return self.send_json(200,dict(status='ok',mode=service.mode,llm_configured=ModelConfig.load().public()['configured'],model_config=ModelConfig.load().public()))
+                return self.send_json(200,dict(status='ok',mode=service.mode,llm_configured=ModelConfig.load().public()['configured'],model_config=ModelConfig.load().public(),weather_source=os.environ.get('WEATHER_SOURCE','auto')))
             if self.path=='/api/locations':return self.send_json(200,list(service.store.locations().values()))
             if self.path=='/api/profile':return self.send_json(200,WinterProfile().describe())
             files={'/':'index.html','/app.js':'app.js','/style.css':'style.css'}

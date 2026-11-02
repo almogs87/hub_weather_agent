@@ -11,6 +11,7 @@ from .winter import WinterProfile, snowfall_disruptions
 from .scenarios import Hub, Demand, evaluate, validate
 from .replay_report import enrich_report
 from .intent_policy import apply_metric_policy
+from .weather_sources import WeatherSources
 
 from .providers import OpenAIPlanner, ModelConfig, build_planner
 
@@ -47,7 +48,7 @@ class DemoPlanner:
 class Service:
     def __init__(self,store=None,weather=None,planner=None,mode='live'):
         self.store=store or Store()
-        self.weather=weather or WeatherClient()
+        self.weather=weather or WeatherSources()
         self.mode=mode
         self.planner=planner or (DemoPlanner() if mode=='demo' else build_planner())
 
@@ -58,14 +59,16 @@ class Service:
         self.store.add_location(location.model_dump())
         return location.model_dump()
 
-    def weather_analysis(self,location_id,start,end,hazard,threshold=None):
+    def weather_analysis(self,location_id,start,end,hazard,threshold=None,dataset=None):
         locations=self.store.locations()
         if location_id not in locations:raise ValueError('Unknown location ID: '+location_id)
         if end<start or (end-start).days>6000 or start.year<1940:
             raise ValueError('Weather analysis supports up to 6001 days starting in 1940 or later')
         location=locations[location_id]
         try:
-            data=self.weather.fetch(WeatherRequest(location['latitude'],location['longitude'],start,end,location['timezone']))
+            request=WeatherRequest(location['latitude'],location['longitude'],start,end,location['timezone'])
+            data=dataset if dataset is not None else (self.weather.fetch(request,hazard=hazard) if isinstance(self.weather,WeatherSources) else self.weather.fetch(request))
+            if isinstance(data,Exception):raise data
         except RuntimeError as exc:
             raise RuntimeError(f'Weather data for {location_id} ({start} through {end}): {exc}') from exc
         result=exposure(data['rows'],start,end,hazard,threshold)
@@ -85,12 +88,18 @@ class Service:
         events,evidence=[],[]
         weather_rows={}
         profile=WinterProfile()
+        if weather_snapshot is None and hasattr(self.weather,'fetch_group'):
+            identifiers=set(scenario.hub_locations.values())
+            if not identifiers<=set(locations):raise ValueError('Unknown weather location')
+            requests={i:WeatherRequest(locations[i]['latitude'],locations[i]['longitude'],scenario.start,scenario.end,locations[i]['timezone']) for i in identifiers}
+            weather_snapshot=self.weather.fetch_group(requests,hazard='snow')
         for hub in hubs:
             identifier=scenario.hub_locations[hub.id]
             if identifier not in locations:raise ValueError('Unknown weather location: '+identifier)
             loc=locations[identifier]
             dataset=(weather_snapshot[identifier] if weather_snapshot is not None else
                      self.weather.fetch(WeatherRequest(loc['latitude'],loc['longitude'],scenario.start,scenario.end,loc['timezone'])))
+            if isinstance(dataset,Exception):raise dataset
             expected=(scenario.end-scenario.start).days+1
             if len(dataset['rows'])!=expected:raise ValueError('Replay requires every date')
             weather_rows[hub.id]=dataset['rows']
@@ -99,7 +108,7 @@ class Service:
         result=evaluate(hubs,demands,links,scenario.max_distance_km,scenario.start,scenario.end,events)
         enrich_report(result,hubs,demands,weather_rows,profile)
         result.update(profile=profile.describe(),evidence=evidence,weather_trigger_days=len(events),
-                      limitation='Same local calendar dates replayed; subdaily event overlap across timezones is not modeled. No annual loss probabilities inferred.')
+                      limitation='Matching reported dates replayed; source-specific observation windows and subdaily overlap are not modeled. No annual loss probabilities inferred.')
         return result
 
     def chat(self,payload):
@@ -133,9 +142,16 @@ class Service:
             start=intent.start or date(2011,1,1)
             end=intent.end or date(2025,12,31)
             hazard=intent.hazard or 'snow'
+            snapshot=None
+            if hasattr(self.weather,'fetch_group'):
+                registered=self.store.locations()
+                if not set(intent.location_ids)<=set(registered):raise ValueError('Unknown location ID')
+                if end<start or (end-start).days>6000 or start.year<1940:raise ValueError('Invalid or excessive weather period')
+                requests={i:WeatherRequest(registered[i]['latitude'],registered[i]['longitude'],start,end,registered[i]['timezone']) for i in intent.location_ids}
+                snapshot=self.weather.fetch_group(requests,hazard=hazard)
             for loc in intent.location_ids:
                 try:
-                    cards.append(self.weather_analysis(loc,start,end,hazard,intent.threshold))
+                    cards.append(self.weather_analysis(loc,start,end,hazard,intent.threshold,dataset=snapshot[loc] if snapshot is not None else None))
                 except RuntimeError as exc:
                     if intent.action!='compare':raise
                     data_errors.append(dict(location_id=loc,error=str(exc)))
@@ -165,4 +181,5 @@ class Service:
         label={'snowfall_sum':'daily snowfall','precipitation_sum':'daily precipitation','temperature_2m_max':'daily maximum temperature','temperature_2m_min':'daily minimum temperature','wind_speed_10m_max':'daily maximum wind speed'}[r['variable']]
         return (f"{r['location_id']}: {r['exceedance_days']} of {r['valid_days']} valid days ({r['exceedance_percent']:.2f}%) "
                 f"had {label} {r['operator']} {r['threshold']} {r['unit']} during {r['start']}–{r['end']}. "
-                f"Missing days: {r['missing_days']}. Trend: {r['trend'].get('direction','insufficient evidence')}. This is exposure, not predicted shutdown.")
+                f"Missing days: {r['missing_days']}. Trend: {r['trend'].get('direction','insufficient evidence')}. This is exposure, not predicted shutdown. "
+                f"Source: {r.get('evidence',{}).get('source','unspecified')}.")

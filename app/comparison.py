@@ -15,10 +15,11 @@ def compare_networks(service,payload):
     identifiers=set(config.reference.hub_locations.values())|set(config.candidate.hub_locations.values())
     locations=service.store.locations()
     if not identifiers<=set(locations):raise ValueError('Comparison contains unknown weather locations')
-    snapshot={}
-    for identifier in sorted(identifiers):
-        loc=locations[identifier]
-        snapshot[identifier]=service.weather.fetch(WeatherRequest(loc['latitude'],loc['longitude'],config.reference.start,config.reference.end,loc['timezone']))
+    requests={i:WeatherRequest(locations[i]['latitude'],locations[i]['longitude'],config.reference.start,config.reference.end,locations[i]['timezone']) for i in sorted(identifiers)}
+    snapshot=(service.weather.fetch_group(requests,hazard='snow') if hasattr(service.weather,'fetch_group') else
+              {i:service.weather.fetch(r) for i,r in requests.items()})
+    for result in snapshot.values():
+        if isinstance(result,Exception):raise result
     reference=service.replay(config.reference.model_dump(mode='json'),weather_snapshot=snapshot)
     candidate=service.replay(config.candidate.model_dump(mode='json'),weather_snapshot=snapshot)
     for report,scenario in [(reference,config.reference),(candidate,config.candidate)]:
