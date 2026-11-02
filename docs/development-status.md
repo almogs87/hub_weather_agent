@@ -1,9 +1,9 @@
-# Development status
+# Development status — 2 November 2026
 
-Completed: deterministic network allocation and outage/recovery simulation; historical-weather adapter; caching/provenance; exposure and trend calculations; coordinate-based CLI. No real hubs selected.
+1. Foundation: implemented deterministic allocation, backup capacity, regional outage and recovery simulation.
+2. Data: ERA5 API, validation, cache and provenance implemented; live 15-year request verified by user. Population and dedicated rare-hazard adapters pending.
+3. Analytics: exposure, ranking, annual trend and uncertainty implemented. Daily winter sensitivity profile linked to synchronized historical network replay. No calibrated closure model.
+4. API/chat: local HTTP API, browser chat, sortable metric cards, SQLite context, strict OpenAI function schema and replay form implemented. Demo parser explicitly labeled. Live LLM call not yet verified; credentials/model configuration required.
+5. Evaluation/handover: 35 tests and six demo-parser conversation cases pass; browser workflow and mobile width checked. README, architecture and assumptions updated. Live-model evaluation, full development-session export, final interview rehearsal and optional deployment pending.
 
-Validation: 22 automated tests pass. Live API attempt fails in the current sandbox with Windows socket access denied, including after explicit network permission. Live API compatibility remains unverified. No real-world weather conclusions have been generated.
-
-Next: verify live data in the user's normal terminal; implement application API, strict structured LLM intents, conversation state, browser chat and an agent evaluation runner. Preserve existing deterministic tests. Population coverage and NOAA rare-hazard support need separate adapters; unsupported hazards must remain explicit.
-
-Full AI session export is still required for submission; this status file is not a replacement.
+The local server uses Python's standard library instead of the originally proposed FastAPI dependency. No actual hub locations have been selected. National population coverage, actual road/flight disruptions, voice and alerts remain outside implemented scope.

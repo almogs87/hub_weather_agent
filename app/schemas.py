@@ -1,0 +1,58 @@
+"""Strict contracts for browser requests, model intents and tool execution."""
+from datetime import date
+from typing import Literal
+from pydantic import BaseModel, ConfigDict, Field, model_validator
+
+class StrictModel(BaseModel):
+    model_config=ConfigDict(extra='forbid',allow_inf_nan=False)
+
+class Location(StrictModel):
+    id: str=Field(min_length=1,max_length=80)
+    latitude: float=Field(ge=-90,le=90)
+    longitude: float=Field(ge=-180,le=180)
+    timezone: str=Field(min_length=1,max_length=80)
+
+class Intent(StrictModel):
+    action: Literal['weather','compare','winter_replay','explain','clarify','unsupported']
+    location_ids: list[str]
+    hazard: Literal['snow','heavy_precipitation','heat','cold','wind'] | None
+    start: date | None
+    end: date | None
+    threshold: float | None
+    question: str | None
+
+class ChatRequest(StrictModel):
+    message: str=Field(min_length=1,max_length=4000)
+    conversation_id: str | None=None
+    scenario: dict | None=None
+
+class HubInput(StrictModel):
+    id: str
+    capacity: float=Field(gt=0)
+    component: Literal['contiguous_us','alaska','hawaii']='contiguous_us'
+
+class DemandInput(StrictModel):
+    id: str
+    units: float=Field(ge=0)
+    component: Literal['contiguous_us','alaska','hawaii']='contiguous_us'
+
+class LinkInput(StrictModel):
+    hub_id: str
+    demand_id: str
+    distance_km: float=Field(ge=0)
+
+class ScenarioInput(StrictModel):
+    hubs: list[HubInput]=Field(min_length=1,max_length=30)
+    demands: list[DemandInput]=Field(min_length=1,max_length=100)
+    links: list[LinkInput]=Field(max_length=3000)
+    max_distance_km: float=Field(gt=0)
+    start: date
+    end: date
+    # Mapping to explicitly registered coordinates, never an automatic siting choice.
+    hub_locations: dict[str,str]
+
+    @model_validator(mode='after')
+    def check_window(self):
+        if self.end<self.start or (self.end-self.start).days>365:
+            raise ValueError('Replay must span between 1 and 366 days')
+        return self

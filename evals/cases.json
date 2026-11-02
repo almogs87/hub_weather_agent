@@ -1,0 +1,29 @@
+[
+  {
+    "message": "Snow exposure for siteA in 2025",
+    "action": "weather",
+    "hazard": "snow"
+  },
+  {
+    "message": "What about heat?",
+    "action": "weather",
+    "hazard": "heat"
+  },
+  {
+    "message": "Compare siteA and siteB for snow in 2025",
+    "action": "compare",
+    "hazard": "snow"
+  },
+  {
+    "message": "Why?",
+    "action": "explain"
+  },
+  {
+    "message": "Hurricane and flood risk for siteA",
+    "action": "unsupported"
+  },
+  {
+    "message": "Run a winter replay",
+    "action": "winter_replay"
+  }
+]

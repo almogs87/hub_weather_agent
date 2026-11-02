@@ -1,51 +1,96 @@
 # Weather Risk Intelligence Agent
 
-First milestone: deterministic daily network scenario engine. No real hub locations have been selected. This is not yet the complete assignment submission: live weather, trends, API, LLM, chat and evaluation cases for the agent remain to be implemented.
+A local conversational analyst for historical weather exposure and explicit winter network scenarios. No actual hub sites are selected automatically.
 
-Requires Python 3.11+; this milestone uses only the standard library.
+## Run
 
-From this directory:
-
-```powershell
-python -m unittest discover -s tests -v
-python -m app.demo
-```
-
-The demo returns JSON for three abstract hubs and two demand areas. A regional event closes A and B for three days. It produces 240 unserved demand-days and returns to baseline service on January 4 of the synthetic 2025 timeline.
-
-The allocator maximizes served divisible demand, then minimizes total demand-distance using a residual-network minimum-cost maximum-flow algorithm. This avoids greedy assignments stranding demand. Stable ID ordering resolves equal-cost choices reproducibly. Capacity is enforced each day; unavailable hubs have null utilization rather than a division by zero.
-
-Missing distance links are ineligible. Service components prevent mainland road backup to Alaska or Hawaii. Distances are supplied scenario inputs, not measured road travel. Overlapping outages use the lowest available-capacity fraction. Recovery is linear and explicitly configured. Unserved demand is not carried forward as backlog.
-
-Source modules: `app/scenarios.py` (models, validation, allocator, simulation), `app/demo.py` (synthetic demonstration), `tests/test_scenarios.py` (acceptance and edge cases).
-
-Do not interpret synthetic closures, recovery periods or capacities as observed company data or calibrated weather probabilities. The full AI conversation must be exported separately for the assignment; this repository does not yet include that export.
-
-
-## Historical weather milestone
-
-Implemented: ERA5 daily data retrieval, source provenance, validated disk cache, threshold exposure, comparable-location ranking and descriptive annual trends. API, LLM chat, population ingestion and rare-hazard adapters remain pending.
-
-Install the timezone database (needed by Python on Windows):
+Requires Python 3.11+ (tested with the bundled Python; user verified weather retrieval with Python 3.15).
 
 ~~~powershell
+cd C:\Users\Almog\Documents\Codex\hub_weather_agent
 python -m pip install -r requirements.txt
+python -m app.server --demo
 ~~~
 
-Run analysis for coordinates you supply:
+Open http://127.0.0.1:8000 . Demo mode uses a limited deterministic question parser, not an LLM; weather still comes from the real API or its cache. No synthetic weather is substituted in the application. Add candidate coordinates and an IANA timezone, then ask using that location's ID, e.g. 'Snow exposure for my-site in 2025', followed by 'What about heat?'. Demo parsing only recognizes simple location IDs, years and hazard words; it is for checking the interface.
+
+For AI mode, set OPENAI_API_KEY securely in your local environment and set OPENAI_MODEL to a model available to your account that supports strict function calling. Then run:
+
+~~~powershell
+python -m app.server
+~~~
+
+The example .env file is not auto-loaded. Never commit API keys or paste them into a chat. An AI call is made only when live-mode chat is submitted. Real model integration is implemented but has not been tested with live credentials. Provider refusal, incomplete output or invalid schema cannot execute an analysis.
+
+The model selects an approved analysis through a strict JSON-schema function call. Python validates that call and computes every number. Explanations are deterministic templates grounded in returned metrics, preventing narrative arithmetic drift. Conversation context and registered locations persist in SQLite. Use New conversation to clear the active context.
+
+## Winter replay
+
+Paste an explicit network into the page's scenario form, map hubs to registered location IDs, and select Run replay. Alternatively leave the JSON in that form and ask 'Run a winter replay'; the chat request includes the supplied network and stores it in that conversation. Follow-up replay requests reuse that network. No capacities or links are invented.
+
+~~~json
+{
+  "hubs": [{"id":"A","capacity":80}],
+  "demands": [{"id":"X","units":60}],
+  "links": [{"hub_id":"A","demand_id":"X","distance_km":10}],
+  "max_distance_km":100,
+  "start":"2025-01-01", "end":"2025-01-07",
+  "hub_locations":{"A":"YOUR_REGISTERED_LOCATION_ID"}
+}
+~~~
+
+Version-one snowfall profile: >=5 cm/day gives 80% available capacity with no additional recovery day; >=15 cm gives 50% with one recovery day; >=25 cm gives 10% with two recovery days. These are illustrative sensitivity assumptions, not official heavy-snow warnings, actual closures or calibrated losses. Bands are configurable through WinterProfile in Python; the UI currently uses the versioned default. All modeled snow days become one-day disruptions; recovery is linear; overlaps use the lowest available fraction.
+
+Historical dates are synchronized by local calendar date. Daily values cannot establish subdaily event overlap, snow squalls, freezing rain, blizzards, road closures or flight cancellations. Airport capacity and road-access closures are not modeled. No rare-event annual probabilities are inferred.
+
+## Weather CLI
 
 ~~~powershell
 python -m app.weather_cli --latitude 39.7392 --longitude -104.9903 --timezone America/Denver --start 2011-01-01 --end 2025-12-31 --hazard snow
 ~~~
 
-These are integration-test coordinates, not a facility recommendation. Supported hazards: snow, heavy_precipitation, heat, cold, wind. Override the analysis threshold with --threshold; force new retrieval with --refresh. Output is JSON; data-source failures produce a nonzero exit status and an explicit error without fixture substitution.
+Coordinates above are an integration example, not a facility recommendation. Hazards: snow, heavy_precipitation, heat, cold, wind. Use --threshold to override and --refresh to retrieve again. Default weather window: 2011-2025, 15 complete years. Defaults: snowfall >0 cm; precipitation >=25 mm/day; maximum temperature >=35 C; minimum temperature <=-10 C; maximum 10m wind >=50 km/h. All are analysis definitions, not closure criteria. Heavy precipitation is not flood probability and wind is not hurricane probability.
 
-Defaults: snowfall >0 cm; precipitation >=25 mm/day; maximum temperature >=35 C; minimum temperature <=-10 C; maximum 10m wind >=50 km/h. These are illustrative analysis thresholds, not official closure triggers. Heavy precipitation is not flood probability and wind is not hurricane probability.
+Percentages exclude missing days and show coverage. Missing days break event runs. Annual trends require >=12 eligible years within a period spanning >=15 years, with >=4 eligible years in each endpoint five-year window. Eligible years have complete requested calendar windows and >=95% valid observations. Rankings require matching definitions/periods and >=95% overall coverage. Seasonal missingness can still bias comparisons.
 
-Weather percentages use valid days as the denominator and show coverage. Missing days break observed event runs. Annual trends require at least 12 eligible years within a period spanning at least 15 years; eligibility requires a complete requested calendar year and >=95% valid data. At least four eligible years are required in each endpoint five-year window. Rankings exclude locations below 95% overall coverage and require matching definitions and periods. Comparable overall coverage does not eliminate seasonal missingness bias.
+Trends use a Theil-Sen slope with an approximate circular residual block bootstrap interval (block length 3, 400 samples, fixed seed). This assumes a linear trend and stationary residual dependence. It is descriptive, not a forecast or overall safety guarantee.
 
-Trend slope uses Theil-Sen with an approximate 95% circular residual block bootstrap interval (three-observation blocks, 400 samples, fixed seed). This assumes a linear trend and stationary residual dependence; missing years complicate interpretation. It is descriptive, not a forecast or a safety guarantee. Inspect the annual series and test other thresholds before making decisions.
+## Tests and evaluations
 
-Data: https://open-meteo.com/en/docs/historical-weather-api . ERA5 is pinned for consistency across years. Reanalysis represents a grid cell, not a building sensor. Check provider licensing and usage terms before commercial deployment. Cache files contain original response text plus request URL, timestamp and SHA-256; this first version uses plain JSON rather than compressed storage.
+~~~powershell
+python -m unittest discover -s tests -v
+python -m evals.run
+python -m evals.run --live-model
+~~~
 
-Verification: 22 unit/acceptance tests pass. The development sandbox blocks outgoing sockets (WinError 10013), so live retrieval has not yet been verified. Run the coordinate command above from your normal PowerShell session; cached fixtures are only used in isolated unit tests, never automatically in live mode.
+35 tests pass; six conversation evaluation cases pass with the demo parser and explicit synthetic weather. --live-model calls the configured real LLM while retaining synthetic weather, isolating planning quality from network/data variation. It requires credentials and may incur provider charges. It has not yet been run live.
+
+Headless browser checks passed using isolated synthetic weather: registration, snowfall analysis, heat follow-up, table sorting, network replay, and a 390px mobile layout without page overflow. Live historical weather was independently verified by the user from PowerShell. No actual model call has been verified yet.
+
+## API
+
+- GET /api/health: readiness, mode, configuration presence (no credentials).
+- GET/POST /api/locations: list/register coordinates.
+- GET /api/profile: profile, assumptions and source references.
+- POST /api/chat: message, optional conversation_id and optional scenario; returns answer, metric cards, intent and optional scenario_result.
+- POST /api/scenarios/replay: explicit network JSON; returns daily allocation, losses, recovery and evidence.
+
+Local single-user server binds only 127.0.0.1. The standard-library HTTP server deliberately avoids extra server dependencies for this take-home; public production deployment requires a production server, authentication and operational controls.
+
+## Storage and structure
+
+- app/weather.py, weather_cli.py: ERA5 retrieval, cache and historical analytics.
+- app/scenarios.py, winter.py: allocation, disruption/recovery and snowfall profile.
+- app/agent.py, schemas.py: model planner, validated requests and deterministic tools.
+- app/storage.py: SQLite state; app/server.py: local API.
+- app/static/: browser interface; tests/: deterministic and mocked-provider tests.
+- evals/: small conversation evaluation set and runner.
+- docs/: architecture, assumptions, implementation plan and development status.
+
+Runtime SQLite and weather caches live under data/ and are ignored by Git. Cache envelopes contain raw response text, request URL, timestamp and SHA-256. They are plain JSON rather than compressed files in this version.
+
+## Remaining scope
+
+Population-based national coverage, automatic facility optimization, dedicated flood/hurricane evidence, actual transport-closure data, shipment backlog, voice, alerts and deployment are not implemented. Coordinates can be registered throughout the US, but that does not demonstrate nationwide coverage. Mainland, Alaska and Hawaii are separate service components in scenario inputs; the system does not infer a component from coordinates.
+
+The mandatory full AI-development-session export remains outstanding; a design summary is not a substitute. See docs/architecture.md and docs/assumptions.md.
