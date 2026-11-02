@@ -47,7 +47,7 @@ Updated: 2 November 2026. No actual hub locations have been selected.
 
 ## 5. Evaluation and handover
 
-- [x] 68 automated tests pass, including an intentionally invalid allocation detected by the audit.
+- [x] 70 automated tests pass, including an intentionally invalid allocation detected by the audit.
 - [x] Seven conversation cases pass with the demo parser and explicit synthetic weather.
 - [x] README, architecture and assumptions documents.
 - [x] User manual checks: snow baseline, heat follow-up, heavy snow subset and unsupported flight data.
@@ -101,3 +101,5 @@ User verified Groq live mode can plan Denver snowfall and heat questions. Cross-
 - [ ] Repeat Denver/Chicago comparison with NOAA and inspect station coverage.
 
 See docs/weather-sources.md. Station daily observation windows differ from ERA5 local civil days; no silent mixing is permitted.
+
+NOAA follow-up: network downloads verified by user; all first eight cached stations had zero 2025 snow observations. Added inventory-based element/year filtering and expanded eligible candidate cap to sixteen; 70 tests pass. Retry the Chicago command to verify an accepted active station.

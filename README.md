@@ -63,7 +63,7 @@ python -m evals.run
 python -m evals.run --live-model
 ~~~
 
-68 tests pass; seven conversation evaluation cases pass with the demo parser and explicit synthetic weather. --live-model calls the configured real LLM while retaining synthetic weather, isolating planning quality from network/data variation. It requires credentials and may incur provider charges. It has not yet been run live.
+70 tests pass; seven conversation evaluation cases pass with the demo parser and explicit synthetic weather. --live-model calls the configured real LLM while retaining synthetic weather, isolating planning quality from network/data variation. It requires credentials and may incur provider charges. It has not yet been run live.
 
 Headless browser checks passed using isolated synthetic weather: registration, snowfall analysis, heat follow-up, table sorting, network replay, and a 390px mobile layout without page overflow. Live historical weather was independently verified by the user from PowerShell. No actual model call has been verified yet.
 
@@ -112,3 +112,5 @@ For weather connectivity diagnostics run python -m app.weather_probe from the pr
 ## Independent weather fallback
 
 NOAA NCEI GHCN-Daily station observations now back up Open-Meteo. Default WEATHER_SOURCE=auto retries the complete analysis with NOAA when a primary service/connection request fails; it never silently ranks mixed ERA5 and station results. Sources are shown in answers and evidence. NOAA covers snowfall, precipitation, maximum/minimum temperature; maximum wind is explicitly unsupported. The live launcher supports -WeatherSource noaa, and weather_cli supports --source noaa. See docs/weather-sources.md for source definitions, caveats and a direct verification command. Live NOAA retrieval still needs user-terminal verification.
+
+NOAA station selection uses the official element/year inventory before checking up to sixteen nearest eligible stations. This excludes inactive historical stations before they consume the daily-data search budget. Daily quality/95% coverage checks remain mandatory.

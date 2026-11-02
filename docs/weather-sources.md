@@ -13,7 +13,7 @@ In auto mode a failed Open-Meteo connection/service request causes the complete 
 
 SNOW = new snowfall in millimeters, converted to centimeters. SNWD = snow depth and is never substituted. PRCP is tenths of millimeters, converted to millimeters. TMAX/TMIN are tenths of Celsius, converted to Celsius. Missing -9999 values and nonblank quality flags become null; trace amounts remain zero at reported precision. Daily maximum wind is not supported, and average wind is never substituted.
 
-Station selection: sort US stations within 100 km by distance and stable ID; inspect up to eight candidates; choose the nearest with >=95% requested-variable coverage across the requested period. No suitable station means an explicit error. This bounded search can miss a suitable station outside the candidate cap. It does not prove the chosen station represents a particular facility. Station ID, name, coordinates, distance, rejected candidates, raw-file hashes and retrieval times accompany results. Source files are cached under data/cache/noaa/ and ignored by Git. Use --refresh in the CLI to retrieve updated snapshots.
+Station selection: sort US stations within 100 km by distance and stable ID; filter by NOAA inventory showing the requested variable spans the requested years, then inspect up to sixteen eligible candidates; choose the nearest with >=95% requested-variable coverage across the requested period. No suitable station means an explicit error. This bounded search can miss a suitable station outside the candidate cap. It does not prove the chosen station represents a particular facility. Station ID, name, coordinates, distance, rejected candidates, raw-file hashes and retrieval times accompany results. Source files are cached under data/cache/noaa/ and ignored by Git. Use --refresh in the CLI to retrieve updated snapshots.
 
 ## Important interpretation
 
@@ -41,7 +41,7 @@ Default startup uses auto fallback, without that extra argument.
 
 ## Verification status
 
-68 automated tests pass, including NOAA units, quality filtering, snow-versus-depth separation, cache provenance, candidate rejection and whole-analysis source consistency. Real NOAA retrieval remains unverified: the development sandbox's network rejected the station-catalog request. Run the command above in the normal user terminal before relying on the fallback in the interview. Both providers can be unavailable; the app never manufactures observations.
+70 automated tests pass, including NOAA units, quality filtering, snow-versus-depth separation, cache provenance, candidate rejection and whole-analysis source consistency. The user verified live NOAA downloads, but the initial eight-candidate search selected inactive stations with no 2025 snowfall data. Inventory-based eligibility now excludes them before the sixteen-candidate limit. A successful accepted Chicago result remains to be verified. Run the command above in the normal user terminal before relying on the fallback in the interview. Both providers can be unavailable; the app never manufactures observations.
 
 ## Official documentation
 
@@ -50,3 +50,5 @@ Default startup uses auto fallback, without that extra argument.
 - https://www.ncei.noaa.gov/pub/data/ghcn/daily/all/
 
 NOAA dataset DOI: https://doi.org/10.7289/V5D21VHZ
+
+The NOAA inventory is a separate one-time cached download. Its first/last years are only a candidate filter, not proof of complete daily coverage. Actual records still must meet 95%. Missing values remain null; no incomplete station is made acceptable by this fix.

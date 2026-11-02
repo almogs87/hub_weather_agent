@@ -2,7 +2,7 @@ from datetime import date
 import json
 import tempfile
 import unittest
-from app.noaa import NOAAClient,parse_daily,stations
+from app.noaa import NOAAClient,parse_daily,stations,eligible_inventory
 from app.weather import WeatherRequest,rank_exposure
 from app.weather_sources import WeatherSources
 
@@ -14,6 +14,9 @@ def record(element,values,quality=None):
         value=values[i] if i<len(values) else -9999
         fields.append(f'{value:5d} '+('X' if quality==i else ' ')+'0')
     return STATION+'202501'+element+''.join(fields)
+
+def inventory():
+    return f'{STATION} {40:8.4f} {-105:9.4f} SNOW 2000 2026'
 
 def catalog():
     return f'{STATION} {40:8.4f} {-105:9.4f} {1000:6.1f} CO '+f'{"TEST STATION":30s}'
@@ -38,18 +41,18 @@ class NOAATests(unittest.TestCase):
         calls=[]
         def transport(url):
             calls.append(url)
-            return (catalog() if url.endswith('stations.txt') else record('SNOW',[10,20,30])+'\n'+record('SNWD',[999,999,999])).encode()
+            return (catalog() if url.endswith('stations.txt') else inventory() if url.endswith('inventory.txt') else record('SNOW',[10,20,30])+'\n'+record('SNWD',[999,999,999])).encode()
         with tempfile.TemporaryDirectory() as folder:
             client=NOAAClient(folder,transport)
             first=client.fetch(self.request)
             second=client.fetch(self.request)
-            self.assertEqual(len(calls),2)
+            self.assertEqual(len(calls),3)
             self.assertEqual(first['rows'][0]['snowfall_sum'],1)
             self.assertTrue(second['evidence']['cache_hit'])
             self.assertEqual(first['evidence']['source_id'],second['evidence']['source_id'])
             self.assertEqual(first['evidence']['station']['id'],STATION)
     def test_low_coverage_and_wind_refused(self):
-        def transport(url):return (catalog() if url.endswith('stations.txt') else record('SNOW',[10,-9999,0])).encode()
+        def transport(url):return (catalog() if url.endswith('stations.txt') else inventory() if url.endswith('inventory.txt') else record('SNOW',[10,-9999,0])).encode()
         with tempfile.TemporaryDirectory() as folder:
             client=NOAAClient(folder,transport)
             with self.assertRaisesRegex(RuntimeError,'95%'):client.fetch(self.request)
@@ -87,5 +90,30 @@ class SourceSelectionTests(unittest.TestCase):
         common=dict(hazard='snow',operator='>',threshold=0,unit='cm',start='2025-01-01',end='2025-12-31',completeness=1,exceedance_percent=10)
         with self.assertRaisesRegex(ValueError,'mixed weather'):
             rank_exposure([dict(common,location_id='A',evidence=dict(source='NOAA')),dict(common,location_id='B',evidence=dict(source='ERA5'))])
+
+class InventoryTests(unittest.TestCase):
+    def test_old_or_wrong_element_station_is_filtered(self):
+        text=inventory()+'\n'+inventory().replace('2026','2020').replace(STATION,'USW00000002')+'\n'+inventory().replace('SNOW','TMAX').replace(STATION,'USW00000003')
+        self.assertEqual(eligible_inventory(text,'SNOW',2011,2025,{STATION,'USW00000002','USW00000003'}),{STATION})
+
+    def test_inactive_nearby_stations_do_not_consume_search_budget(self):
+        active='USW00000011'
+        lines=[]
+        for i in range(1,12):
+            identifier=f'USW{i:08d}'
+            lines.append(catalog().replace(STATION,identifier))
+        active_record=record('SNOW',[10,20,30]).replace(STATION,active)
+        calls=[]
+        def transport(url):
+            calls.append(url)
+            if url.endswith('stations.txt'):return '\n'.join(lines).encode()
+            if url.endswith('inventory.txt'):return inventory().replace(STATION,active).encode()
+            self.assertTrue(url.endswith(active+'.dly'))
+            return active_record.encode()
+        with tempfile.TemporaryDirectory() as folder:
+            request=WeatherRequest(40,-105,date(2025,1,1),date(2025,1,3),'UTC')
+            result=NOAAClient(folder,transport,max_candidates=1).fetch(request)
+            self.assertEqual(result['evidence']['station']['id'],active)
+            self.assertEqual(len(calls),3)
 
 if __name__=='__main__':unittest.main()
