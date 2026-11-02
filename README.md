@@ -129,4 +129,4 @@ Use the compact map to select up to two illustrative locations, one weather even
 
 ## Portable live launcher
 
-Run `python scripts/start_live.py` to use Groq. The key is read from `GROQ_API_KEY` if set, otherwise prompted without echo and passed only to the child process. Add `--port 8767`, `--weather-source noaa`, `--model MODEL`, or `--action evaluate` as needed. For OpenAI use `--provider openai --model MODEL`. The launcher does not save the key.
+Run `python scripts/start_live.py` to use Groq. The key is read from the first Groq key in the Git-ignored `keys.local.md`, or from `GROQ_API_KEY` if no local key exists; if neither is available, it prompts without echo. The key is passed only to the child process. Add `--port 8767`, `--weather-source noaa`, `--model MODEL`, or `--action evaluate` as needed. For OpenAI use `--provider openai --model MODEL`. The launcher does not save the key.

@@ -9,6 +9,13 @@ import sys
 
 ROOT=Path(__file__).resolve().parent.parent
 
+def local_groq_key():
+    """Use the first Groq key from the private local Markdown file, if present."""
+    path=ROOT/'keys.local.md'
+    if not path.is_file():return None
+    match=re.search(r'\bgsk_[A-Za-z0-9]{20,}\b',path.read_text(encoding='utf-8'))
+    return match.group(0) if match else None
+
 def main(argv=None):
     parser=argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--provider',choices=['groq','openai'],default='groq')
@@ -22,6 +29,11 @@ def main(argv=None):
     if not model:parser.error('--model is required for OpenAI')
     variable='GROQ_API_KEY' if args.provider=='groq' else 'OPENAI_API_KEY'
     environment=os.environ.copy()
+    if args.provider=='groq':
+        try:key=local_groq_key()
+        except (OSError,UnicodeError) as exc:
+            print(f'Could not read keys.local.md: {exc}',file=sys.stderr);return 1
+        if key:environment[variable]=key
     if not environment.get(variable):
         try:key=getpass.getpass(f'Enter your {args.provider} API key (hidden): ').strip()
         except (EOFError,KeyboardInterrupt):print('\nCancelled.',file=sys.stderr);return 1
