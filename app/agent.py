@@ -9,6 +9,7 @@ from .storage import Store
 from .weather import WeatherClient, WeatherRequest, exposure, trend, rank_exposure
 from .winter import WinterProfile, snowfall_disruptions
 from .scenarios import Hub, Demand, evaluate, validate
+from .replay_report import enrich_report
 
 class OpenAIPlanner:
     def __call__(self,message,state,locations):
@@ -39,6 +40,8 @@ class DemoPlanner:
     """Explicit offline parser for interface tests, not an AI substitute."""
     def __call__(self,message,state,locations):
         text=message.lower()
+        if message.lstrip().startswith('{'):
+            return Intent(action='clarify',location_ids=[],hazard=None,start=None,end=None,threshold=None,question='Paste network JSON into the Scenario JSON field below and click Run replay; the chat box expects a question.')
         previous=state.get('intent',{})
         base=dict(action='weather',location_ids=[],hazard=previous.get('hazard') or 'snow',start=previous.get('start'),end=previous.get('end'),threshold=previous.get('threshold'),question=None)
         if any(word in text for word in ['hurricane','flood','flight','blizzard','road closure']):
@@ -99,6 +102,7 @@ class Service:
         if set(scenario.hub_locations)!=hub_ids:raise ValueError('Every hub requires exactly one registered weather location')
         locations=self.store.locations()
         events,evidence=[],[]
+        weather_rows={}
         profile=WinterProfile()
         for hub in hubs:
             identifier=scenario.hub_locations[hub.id]
@@ -107,9 +111,11 @@ class Service:
             dataset=self.weather.fetch(WeatherRequest(loc['latitude'],loc['longitude'],scenario.start,scenario.end,loc['timezone']))
             expected=(scenario.end-scenario.start).days+1
             if len(dataset['rows'])!=expected:raise ValueError('Replay requires every date')
+            weather_rows[hub.id]=dataset['rows']
             events.extend(snowfall_disruptions(hub.id,dataset['rows'],profile))
             evidence.append(dict(hub_id=hub.id,**dataset['evidence']))
         result=evaluate(hubs,demands,links,scenario.max_distance_km,scenario.start,scenario.end,events)
+        enrich_report(result,hubs,demands,weather_rows,profile)
         result.update(profile=profile.describe(),evidence=evidence,weather_trigger_days=len(events),
                       limitation='Same local calendar dates replayed; subdaily event overlap across timezones is not modeled. No annual loss probabilities inferred.')
         return result

@@ -113,4 +113,28 @@ class AgentTests(unittest.TestCase):
         self.assertAlmostEqual(r['scenario_result']['incremental_unserved_demand_days'],55)
         self.assertIn('illustrative',r['answer'])
 
+    def test_replay_summary_and_recovery_evidence(self):
+        result=self.service.replay(self.scenario())
+        self.assertEqual(result['summary']['affected_days'],2)
+        self.assertEqual(result['summary']['days_with_unserved_demand'],2)
+        self.assertTrue(result['validation']['passed'])
+        self.assertEqual(result['days'][0]['weather_impacts'][0]['snowfall_cm'],25)
+        self.assertEqual(result['days'][1]['weather_impacts'][0]['rule'],'Recovery from earlier snowfall')
+        self.assertEqual(result['days'][2]['weather_impacts'],[])
+
+    def test_pasted_json_gets_guidance(self):
+        result=self.service.chat(dict(message=json.dumps(self.scenario())))
+        self.assertEqual(result['intent']['action'],'clarify')
+        self.assertIn('Scenario JSON',result['answer'])
+        self.assertEqual(result['cards'],[])
+
+    def test_accounting_audit_detects_invalid_allocation(self):
+        from app.replay_report import enrich_report
+        from app.scenarios import Hub,Demand
+        result=self.service.replay(self.scenario())
+        result['days'][0]['assignments'][0]['units']=1000
+        rows=FakeWeather().fetch(type('R',(),dict(start=date(2025,1,1),end=date(2025,1,3)))())['rows']
+        enrich_report(result,[Hub('A',100)],[Demand('X',60)],{'A':rows},WinterProfile())
+        self.assertFalse(result['validation']['passed'])
+
 if __name__=='__main__':unittest.main()

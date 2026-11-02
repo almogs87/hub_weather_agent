@@ -63,7 +63,7 @@ python -m evals.run
 python -m evals.run --live-model
 ~~~
 
-37 tests pass; six conversation evaluation cases pass with the demo parser and explicit synthetic weather. --live-model calls the configured real LLM while retaining synthetic weather, isolating planning quality from network/data variation. It requires credentials and may incur provider charges. It has not yet been run live.
+40 tests pass; six conversation evaluation cases pass with the demo parser and explicit synthetic weather. --live-model calls the configured real LLM while retaining synthetic weather, isolating planning quality from network/data variation. It requires credentials and may incur provider charges. It has not yet been run live.
 
 Headless browser checks passed using isolated synthetic weather: registration, snowfall analysis, heat follow-up, table sorting, network replay, and a 390px mobile layout without page overflow. Live historical weather was independently verified by the user from PowerShell. No actual model call has been verified yet.
 
@@ -96,3 +96,5 @@ Population-based national coverage, automatic facility optimization, dedicated f
 The mandatory full AI-development-session export remains outstanding; a design summary is not a substitute. See docs/architecture.md and docs/assumptions.md.
 
 A shorter weather query can reuse a verified larger cached period when coordinates, timezone, model, units and variables match exactly. Evidence retains the original source URL/hash and records the requested analysis URL plus subset_from_cache. --refresh bypasses this reuse. Weather connection failures are labeled specifically.
+
+Track completed work and next steps in docs/progress.md. Replay now includes summaries, sortable affected-day rows, recovery triggers and automatic accounting checks. Raw evidence remains collapsed.
