@@ -10,7 +10,7 @@ import time
 from statistics import median
 from urllib.parse import urlencode, parse_qs
 from urllib.error import HTTPError, URLError
-from urllib.request import urlopen
+from urllib.request import Request, urlopen
 from zoneinfo import ZoneInfo
 
 UNITS = {'snowfall_sum':'cm','precipitation_sum':'mm','temperature_2m_max':'°C','temperature_2m_min':'°C','wind_speed_10m_max':'km/h'}
@@ -76,7 +76,8 @@ class WeatherClient:
     def download(url):
         for attempt in range(3):
             try:
-                with urlopen(url,timeout=20) as response:
+                request=Request(url,headers={'User-Agent':'hub-weather-agent/0.1','Accept':'application/json'})
+                with urlopen(request,timeout=20) as response:
                     return response.read()
             except HTTPError as exc:
                 if exc.code not in (502,503,504) or attempt==2:raise
@@ -131,7 +132,14 @@ class WeatherClient:
             try:
                 raw=self.transport(url)
             except HTTPError as exc:
-                raise RuntimeError(f'Weather API rejected the request (HTTP {exc.code}); no matching cached data was available.') from exc
+                detail=''
+                try:
+                    error=json.loads(exc.read(4096).decode('utf-8',errors='replace'))
+                    detail=str(error.get('reason') or error.get('message') or '')
+                except (ValueError,OSError):pass
+                detail=' '.join(detail.split())[:300]
+                suffix=' Provider reason: '+detail if detail else ''
+                raise RuntimeError(f'Weather API rejected the request (HTTP {exc.code}); no matching cached data was available.'+suffix) from exc
             except (URLError,TimeoutError,OSError) as exc:
                 reason=getattr(exc,'reason',exc)
                 code=getattr(reason,'winerror',None) or getattr(reason,'errno',None)

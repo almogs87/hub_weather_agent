@@ -147,4 +147,16 @@ class AgentTests(unittest.TestCase):
         self.assertTrue(result['planning']['policy_adjustments'])
         self.assertEqual(result['cards'][0]['threshold'],15)
 
+    def test_failed_location_does_not_hide_available_comparison(self):
+        original=self.service.weather_analysis
+        def selective(location,*args,**kwargs):
+            if location=='siteB':raise RuntimeError('Weather data for siteB: HTTP 503')
+            return original(location,*args,**kwargs)
+        self.service.weather_analysis=selective
+        result=self.service.chat(dict(message='Compare snow for siteA and siteB in 2025'))
+        self.assertEqual(result['result_status'],'partial')
+        self.assertEqual([c['location_id'] for c in result['cards']],['siteA'])
+        self.assertEqual(result['data_errors'][0]['location_id'],'siteB')
+        self.assertIn('no complete ranking',result['answer'])
+
 if __name__=='__main__':unittest.main()

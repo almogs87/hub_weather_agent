@@ -7,3 +7,6 @@ data/cache/
 data/app.sqlite3*
 
 eval-results/
+
+# Local credentials; never commit
+keys.local.md

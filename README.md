@@ -63,7 +63,7 @@ python -m evals.run
 python -m evals.run --live-model
 ~~~
 
-59 tests pass; seven conversation evaluation cases pass with the demo parser and explicit synthetic weather. --live-model calls the configured real LLM while retaining synthetic weather, isolating planning quality from network/data variation. It requires credentials and may incur provider charges. It has not yet been run live.
+60 tests pass; seven conversation evaluation cases pass with the demo parser and explicit synthetic weather. --live-model calls the configured real LLM while retaining synthetic weather, isolating planning quality from network/data variation. It requires credentials and may incur provider charges. It has not yet been run live.
 
 Headless browser checks passed using isolated synthetic weather: registration, snowfall analysis, heat follow-up, table sorting, network replay, and a 390px mobile layout without page overflow. Live historical weather was independently verified by the user from PowerShell. No actual model call has been verified yet.
 
@@ -106,3 +106,5 @@ Use the replay Scenario JSON as the reference, then supply Candidate network JSO
 Provider and model configuration, hidden-key startup, switching examples and evaluation gates are documented in docs/model-providers.md. No real Groq request has yet been verified with credentials.
 
 Each successful chat answer now includes a collapsed How this answer was produced trace: original model plan, applied policy, response ID/usage when supplied by the provider, and per-location weather cache provenance. Named heavy snow is enforced as the documented illustrative >15 cm/day metric unless an explicit numeric custom amount is supplied. The model plans; deterministic templates produce numerical explanations, so the same query should return the same values in live and demo mode. Weather retrieval retries transient connectivity/502/503/504 errors up to three attempts; access-denied and certificate errors are not retried.
+
+For weather connectivity diagnostics run python -m app.weather_probe from the project root. It tests one-day and full-year Chicago requests directly (no LLM/key), refreshes only successfully validated responses into cache, and reports provider reasons when available. An incomplete location comparison now retains available results but explicitly withholds a complete ranking.
