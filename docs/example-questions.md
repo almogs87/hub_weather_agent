@@ -72,3 +72,7 @@ The application uses three source families: Open-Meteo's ERA5 historical weather
 ## Demo and live modes
 
 Start demo mode with `python -m app.server --demo`. It uses a limited keyword parser, not an AI model, and may misunderstand different phrasing. Click **New conversation** when switching topics if a follow-up inherits unwanted context. Start live mode on Windows, macOS or Linux with `python scripts/start_live.py` for natural-language model planning; it prompts for a key without displaying it. Both modes use real weather and FEMA sources or their caches; if a provider is unavailable the app reports the failure.
+
+## FEMA county-score fallback
+
+When the frequency, severity and assumed-recovery planning index cannot score a selected hazard for both locations, the app may use FEMA National Risk Index county expected annual loss scores for that hazard. It explains that the comparison is partial and identifies the fallback. These scores rank county-level expected losses relative to other counties; they are not percentages, facility-specific loss estimates or shutdown probabilities. Inland flood, coastal flood and hurricane are shown separately. FEMA's modeled period differs from the selected NOAA report period, and missing or different-version scores are not treated as zero. Source and methodology: https://www.fema.gov/sites/default/files/documents/fema_national-risk-index_technical-documentation.pdf.

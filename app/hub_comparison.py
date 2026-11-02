@@ -105,6 +105,37 @@ def summarize_comparison(result,period):
     if trends:answer+=' '+'. '.join(trends)+'.'
     elif period<15:answer+=' This period is too short to establish a trend.'
     else:answer+=' The available evidence does not establish a clear trend.'
+    evidence=result.get('fema_county_fallback',{})
+    if len(evidence)==2 and all(x['id'] in evidence for x in locations):
+        first,second=(evidence[x['id']] for x in locations)
+        versions=[x.get('evidence',{}).get('version') for x in (first,second)]
+        if versions[0] and versions[0]==versions[1]:
+            excluded=set(coverage['excluded_hazards'])
+            mapping=[('event:Hurricane (Typhoon)','hurricane','hurricane'),('event:Flood','inland_flood','inland flood'),('event:Flash Flood','inland_flood','inland flood'),('event:Flood','coastal_flood','coastal flood'),('event:Flash Flood','coastal_flood','coastal flood'),('event:Ice Storm','ice_storm','ice storm'),('event:Tornado','tornado','tornado'),('event:Drought','drought','drought')]
+            pieces=[];missing=[];seen=set()
+            for event,hazard,label in mapping:
+                if event not in excluded or hazard in seen:continue
+                seen.add(hazard)
+                vals=[x.get('scores',{}).get(hazard) for x in (first,second)]
+                if any(v is None for v in vals):missing.append(label);continue
+                shown=[round(value,1) for value in vals]
+                lower=0 if shown[0]<shown[1] else 1 if shown[1]<shown[0] else None
+                outcome=f'{names[lower]} is lower' if lower is not None else 'the scores are tied at this precision'
+                pieces.append(f"{label.title()}: {outcome} ({names[0]} {vals[0]:.1f}, {names[1]} {vals[1]:.1f}).")
+            if pieces:
+                intro='There is not enough comparable frequency and severity data to score all requested hazards with our planning index, so this partial comparison uses FEMA county expected annual loss scores as a fallback.'
+                if all(v is not None for v in scores):intro=f'For the hazards we can score: {answer} '+intro
+                gap=(' Comparable FEMA scores were unavailable for '+', '.join(missing)+'.' if missing else '')
+                counts=[]
+                for hazard in ('event:Hurricane (Typhoon)','event:Flood','event:Flash Flood','event:Ice Storm','event:Tornado','event:Drought'):
+                    group=result['hazards'].get(hazard,{})
+                    items=[group.get('hubs',{}).get(x['id'],{}).get('periods',{}).get(key,{}) for x in locations]
+                    if all('event_reports' in item and item.get('geographic_scope')=='county' for item in items):
+                        counts.append(f"{hazard[6:].lower()}: {items[0]['event_reports']} reports vs {items[1]['event_reports']}")
+                reports=(f" NOAA county reports in {result['end_year']-period+1}-{result['end_year']} ({names[0]} vs {names[1]}): "+'; '.join(counts)+'. Counts can reflect reporting differences.' if counts else '')
+                return intro+'\n\n'+'\n'.join(pieces)+'\n\nFEMA scores compare expected annual losses for each county with other counties; a higher score means higher relative loss. They are not percentages or facility shutdown probabilities, and are not limited to the selected report period. Local conditions and backup capacity can change the decision.'+gap+reports
+    if 'fema_county_fallback' in result and coverage['partial']:
+        answer+=' A comparable FEMA fallback was unavailable for these locations or hazards.'
     return answer+' Recovery settings are illustrative; the index is not a probability of shutdown.'
 
 
@@ -175,5 +206,11 @@ def compare_hubs(service,payload,now=None,periods=None,end_year=None,allow_many=
         overall[str(n)]=values
         coverage[str(n)]=dict(included_hazards=common,excluded_hazards=excluded,excluded_locations=[i for i in config.locations if i not in eligible],partial=bool(excluded or len(eligible)!=len(config.locations)))
     response['overall']=overall;response['coverage']=coverage
+    fallback_events={'Hurricane (Typhoon)','Flood','Flash Flood','Ice Storm','Tornado','Drought'}
+    if len(config.locations)==2 and set(events).intersection(fallback_events) and any(coverage[str(n)]['excluded_hazards'] for n in periods) and hasattr(getattr(service,'fema',None),'fetch'):
+        response['fema_county_fallback']={}
+        for identifier in config.locations:
+            try:response['fema_county_fallback'][identifier]=service.fema.fetch(locations[identifier]['county_fips'])
+            except (RuntimeError,ValueError,KeyError,OSError):pass
     response['summaries']={str(n):summarize_comparison(response,n) for n in periods}
     return response

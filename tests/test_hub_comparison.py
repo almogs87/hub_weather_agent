@@ -7,6 +7,26 @@ from app.storm_events import StormEventsClient
 from app.weather_sources import WeatherSources
 
 class ComparisonTests(unittest.TestCase):
+    def test_fema_fallback_compares_scores_and_explains_limits(self):
+        locations=[dict(id='a',label='Alpha'),dict(id='b',label='Beta')]
+        def county(hurricane,inland,coastal):
+            return dict(evidence=dict(version='2025'),scores=dict(hurricane=hurricane,inland_flood=inland,coastal_flood=coastal))
+        result=dict(locations=locations,end_year=2025,overall={'10':{'a':None,'b':None}},
+                    coverage={'10':dict(partial=True,included_hazards=[],excluded_hazards=['event:Hurricane (Typhoon)','event:Flood'],excluded_locations=['a','b'])},
+                    hazards={'event:Hurricane (Typhoon)':dict(kind='reported_event',hubs={}), 'event:Flood':dict(kind='reported_event',hubs={})},
+                    fema_county_fallback={'a':county(90,70,None),'b':county(80,90,50)})
+        text=summarize_comparison(result,10)
+        self.assertIn('not enough comparable frequency and severity',text)
+        self.assertIn('Hurricane: Beta is lower (Alpha 90.0, Beta 80.0)',text)
+        self.assertIn('Inland Flood: Alpha is lower',text)
+        self.assertIn('unavailable for coastal flood',text)
+        self.assertIn('not percentages or facility shutdown probabilities',text)
+        result['fema_county_fallback']['a']['scores']['hurricane']=99.99
+        result['fema_county_fallback']['b']['scores']['hurricane']=99.98
+        self.assertIn('scores are tied at this precision',summarize_comparison(result,10))
+        result['fema_county_fallback']['b']['evidence']['version']='other'
+        self.assertNotIn('uses FEMA county',summarize_comparison(result,10))
+
     def test_summary_is_qualified_and_shows_available_report_counts(self):
         locations=[dict(id='a',label='Alpha',state='IL'),dict(id='b',label='Beta',state='TX')]
         result=dict(locations=locations,end_year=2025,overall={'10':{'a':20.,'b':40.}},

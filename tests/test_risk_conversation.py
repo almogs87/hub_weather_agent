@@ -43,7 +43,8 @@ class RiskConversationTests(unittest.TestCase):
     def test_missing_data_stays_partial_in_explanation(self):
         first = self.service.chat({'message': 'Compare Miami and Houston for flood'})
         self.assertEqual(first['result_status'], 'partial')
-        self.assertIn('not enough comparable data', first['answer'])
+        self.assertIn('not enough comparable frequency and severity data', first['answer'])
+        self.assertIn('FEMA', first['answer'])
         self.assertTrue(all(x is None for x in first['comparison_result']['overall']['10'].values()))
         explanation = self.service.chat({'message': 'Why?', 'conversation_id': first['conversation_id']})
         self.assertEqual(explanation['result_status'], 'partial')

@@ -26,7 +26,7 @@ class EvaluationFEMA:
         score=values[county_fips]
         return dict(county_fips=county_fips,county='Synthetic',state='XX',
                     scores=dict(winter=score,hurricane=score,inland_flood=score,coastal_flood=score,ice_storm=score,tornado=score,drought=score),
-                    evidence=dict(source_id='fixture:evaluation-fema',source='Synthetic FEMA evaluation data'))
+                    evidence=dict(source_id='fixture:evaluation-fema',source='Synthetic FEMA evaluation data',version='synthetic'))
 
 class EvaluationStorm:
     """Unscored synthetic reports, independent of network access."""
