@@ -65,7 +65,7 @@ class WeatherTests(unittest.TestCase):
     def test_failure_does_not_create_fixtures(self):
         def broken(url):raise TimeoutError('test timeout')
         with tempfile.TemporaryDirectory() as directory:
-            with self.assertRaises(TimeoutError):WeatherClient(directory,broken).fetch(self.request)
+            with self.assertRaisesRegex(RuntimeError,'Weather API connection failed'):WeatherClient(directory,broken).fetch(self.request)
             self.assertEqual(list(Path(directory).iterdir()),[])
 
     def test_missing_breaks_event_runs(self):
@@ -105,5 +105,33 @@ class WeatherTests(unittest.TestCase):
     def test_coordinate_validation(self):
         for latitude in [91,float('nan'),True]:
             with self.assertRaises(ValueError):WeatherRequest(latitude,0,date(2024,1,1),date(2024,1,2),'UTC').parameters()
+
+    def test_subset_reuses_verified_source(self):
+        calls=[]
+        def transport(url):
+            calls.append(url)
+            return json.dumps(self.payload).encode()
+        with tempfile.TemporaryDirectory() as directory:
+            client=WeatherClient(directory,transport)
+            original=client.fetch(self.request)
+            result=client.fetch(WeatherRequest(40,-105,date(2024,2,29),date(2024,3,1),'UTC'))
+            self.assertEqual(len(calls),1)
+            self.assertEqual(len(result['rows']),2)
+            self.assertEqual(result['rows'][0]['date'],'2024-02-29')
+            self.assertTrue(result['evidence']['subset_from_cache'])
+            self.assertEqual(result['evidence']['source_id'],original['evidence']['source_id'])
+            self.assertEqual(result['evidence']['request_url'],original['evidence']['request_url'])
+            self.assertNotEqual(result['evidence']['analysis_request_url'],original['evidence']['request_url'])
+
+    def test_cache_does_not_cross_location(self):
+        calls=[]
+        def transport(url):
+            calls.append(url)
+            return json.dumps(self.payload).encode()
+        with tempfile.TemporaryDirectory() as directory:
+            client=WeatherClient(directory,transport)
+            client.fetch(self.request)
+            client.fetch(WeatherRequest(41,-105,self.request.start,self.request.end,'UTC'))
+            self.assertEqual(len(calls),2)
 
 if __name__=='__main__':unittest.main()

@@ -7,7 +7,8 @@ import math
 from pathlib import Path
 import random
 from statistics import median
-from urllib.parse import urlencode
+from urllib.parse import urlencode, parse_qs
+from urllib.error import HTTPError, URLError
 from urllib.request import urlopen
 from zoneinfo import ZoneInfo
 
@@ -75,26 +76,66 @@ class WeatherClient:
         with urlopen(url,timeout=45) as response:
             return response.read()
 
+    def covering_cache(self,request,url):
+        """Reuse verified observations when only the date window shrinks."""
+        wanted=parse_qs(url.split('?',1)[1])
+        candidates=[]
+        for path in self.cache_dir.glob('*.json'):
+            try:
+                envelope=json.loads(path.read_text(encoding='utf-8'))
+                source_url=envelope['request_url']
+                if source_url.split('?',1)[0]!=url.split('?',1)[0]:continue
+                params=parse_qs(source_url.split('?',1)[1])
+                if {k:v for k,v in params.items() if k not in ('start_date','end_date')}!={k:v for k,v in wanted.items() if k not in ('start_date','end_date')}:continue
+                start=date.fromisoformat(params['start_date'][0])
+                end=date.fromisoformat(params['end_date'][0])
+                if start>request.start or end<request.end:continue
+                raw=envelope['raw_response'].encode('utf-8')
+                if sha256(raw).hexdigest()!=envelope['sha256']:continue
+                source_request=WeatherRequest(request.latitude,request.longitude,start,end,request.timezone)
+                normalize(json.loads(raw),source_request)
+                candidates.append(((end-start).days,source_url,envelope,source_request))
+            except (ValueError,KeyError,TypeError,OSError):
+                continue
+        if not candidates:return None
+        _,_,envelope,source_request=min(candidates,key=lambda item:(item[0],item[1]))
+        return envelope,source_request
+
     def fetch(self,request,refresh=False):
         url='https://archive-api.open-meteo.com/v1/archive?'+urlencode(request.parameters())
         path=self.cache_dir/(sha256(url.encode()).hexdigest()+'.json')
+        source_request=request
         cached=path.exists() and not refresh
-        if cached:
+        covering=self.covering_cache(request,url) if not cached and not refresh else None
+        if covering:
+            envelope,source_request=covering
+            raw=envelope['raw_response'].encode('utf-8')
+            cached=True
+        elif cached:
             envelope=json.loads(path.read_text(encoding='utf-8'))
             raw=envelope['raw_response'].encode('utf-8')
             if envelope['sha256']!=sha256(raw).hexdigest() or envelope['request_url']!=url:
                 raise ValueError('Cache integrity check failed')
         else:
-            raw=self.transport(url)
+            try:
+                raw=self.transport(url)
+            except HTTPError as exc:
+                raise RuntimeError(f'Weather API rejected the request (HTTP {exc.code}); no matching cached data was available.') from exc
+            except (URLError,TimeoutError,OSError) as exc:
+                reason=getattr(exc,'reason',exc)
+                code=getattr(reason,'winerror',None) or getattr(reason,'errno',None)
+                detail=f' (connection code {code})' if code else ''
+                raise RuntimeError('Weather API connection failed'+detail+'. The requested period is not available in a matching cache. Check network access and retry.') from exc
             envelope=dict(request_url=url,retrieved_at=datetime.now(timezone.utc).isoformat(),sha256=sha256(raw).hexdigest(),raw_response=raw.decode('utf-8'))
         payload=json.loads(raw)
-        rows=normalize(payload,request)
+        rows=normalize(payload,source_request)
+        rows=[row for row in rows if request.start.isoformat()<=row['date']<=request.end.isoformat()]
         if not cached:
             self.cache_dir.mkdir(parents=True,exist_ok=True)
             temporary=path.with_suffix('.tmp')
             temporary.write_text(json.dumps(envelope,ensure_ascii=False),encoding='utf-8')
             temporary.replace(path)
-        return dict(rows=rows,evidence=dict(source='Open-Meteo Historical Weather API',model='ERA5',request_url=url,retrieved_at=envelope['retrieved_at'],source_id='weather:'+envelope['sha256'],content_sha256=envelope['sha256'],cache_hit=cached,requested_coordinates=[request.latitude,request.longitude],returned_coordinates=[payload.get('latitude'),payload.get('longitude')],timezone=request.timezone,units=UNITS,limitation='Gridded reanalysis, not a facility sensor; weather exposure is not downtime.'))
+        return dict(rows=rows,evidence=dict(source='Open-Meteo Historical Weather API',model='ERA5',request_url=envelope['request_url'],analysis_request_url=url,source_start=source_request.start.isoformat(),source_end=source_request.end.isoformat(),subset_from_cache=source_request!=request,retrieved_at=envelope['retrieved_at'],source_id='weather:'+envelope['sha256'],content_sha256=envelope['sha256'],cache_hit=cached,requested_coordinates=[request.latitude,request.longitude],returned_coordinates=[payload.get('latitude'),payload.get('longitude')],timezone=request.timezone,units=UNITS,limitation='Gridded reanalysis, not a facility sensor; weather exposure is not downtime.'))
 
 def exposure(rows,start,end,hazard,threshold=None):
     if hazard not in HAZARDS:
